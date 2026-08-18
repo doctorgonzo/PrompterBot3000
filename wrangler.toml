@@ -1,0 +1,18 @@
+name = "autoprompterbot"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[observability]
+enabled = true
+
+# Phase 3 will enable the daily prompt. Uncomment, then `npm run deploy`.
+# Cron is UTC: 15:00 UTC = 10am Madison in summer (CDT), 9am in winter (CST).
+# [triggers]
+# crons = ["0 15 * * *"]
+
+# Phase 4 storage (seen-image dedupe, per-guild config). Create it with:
+#   npx wrangler kv namespace create PROMPT_STATE
+# then paste the printed id below and uncomment.
+# [[kv_namespaces]]
+# binding = "PROMPT_STATE"
+# id = "<paste-id-here>"

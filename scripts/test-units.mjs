@@ -1,0 +1,253 @@
+#!/usr/bin/env node
+/**
+ * Unit tests for prompt selection and thread naming. Runs against the real data
+ * files, so a bad edit to data/*.json fails here rather than in the channel.
+ *
+ *   node scripts/test-units.mjs   (also runs as part of `npm test`)
+ */
+
+import { pickWritingPrompt, promptStats } from "../src/lib/prompts.ts";
+import { threadNameFor } from "../src/lib/threads.ts";
+import { weightedOrder } from "../src/lib/random.ts";
+import { IMAGE_SOURCES, fetchImagePrompt } from "../src/lib/images/index.ts";
+import { displayTitle } from "../src/lib/images/types.ts";
+import challenges from "../data/photoshop-challenges.json" with { type: "json" };
+import { GENRES, LENGTHS, GENRE_LABELS, IMAGE_SOURCE_CHOICES } from "../src/commands/definitions.ts";
+import mixer from "../data/prompt-mixer.json" with { type: "json" };
+
+let passed = 0;
+let failed = 0;
+
+function check(name, ok, detail = "") {
+  if (ok) {
+    passed++;
+    console.log(`  ✓ ${name}`);
+  } else {
+    failed++;
+    console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+/** Deterministic PRNG so failures are reproducible. */
+function seeded(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const DRAWS = 300;
+
+console.log(`\nData (${promptStats.curated} curated, ${promptStats.combinations.toLocaleString()} combinations)`);
+check("curated pack is non-trivial", promptStats.curated >= 50, `only ${promptStats.curated}`);
+check("mixer produces thousands of combinations", promptStats.combinations > 5000);
+
+console.log("\nUnfiltered draws");
+{
+  const rng = seeded(1);
+  const results = Array.from({ length: DRAWS }, () => pickWritingPrompt({}, rng));
+  check("never returns null without filters", results.every(Boolean));
+  const sources = new Set(results.map((r) => r?.source));
+  check("blends curated and generated", sources.has("curated") && sources.has("generated"), [...sources].join(","));
+  check("no prompt carries a constraint unless asked", results.every((r) => r?.constraint === undefined));
+}
+
+console.log("\nFilter combinations");
+{
+  let allRespected = true;
+  let nullMismatch = "";
+
+  for (const genre of [undefined, ...GENRES]) {
+    for (const length of [undefined, ...LENGTHS]) {
+      // Poetry is the only genre with poems, and poems are its only length.
+      const impossible = genre !== undefined && length !== undefined && (genre === "poetry") !== (length === "poem");
+
+      const rng = seeded(42);
+      for (let i = 0; i < DRAWS; i++) {
+        const prompt = pickWritingPrompt({ genre, length }, rng);
+        const label = `${genre ?? "any"}/${length ?? "any"}`;
+
+        if (impossible) {
+          if (prompt !== null) nullMismatch ||= `${label} should be unsatisfiable, got a prompt`;
+          continue;
+        }
+        if (prompt === null) {
+          nullMismatch ||= `${label} returned null but should be satisfiable`;
+          break;
+        }
+        if (genre && prompt.genre !== genre) { allRespected = false; nullMismatch ||= `${label} gave genre ${prompt.genre}`; break; }
+        if (length && prompt.length !== length) { allRespected = false; nullMismatch ||= `${label} gave length ${prompt.length}`; break; }
+      }
+    }
+  }
+
+  check("every filter combination behaves correctly", nullMismatch === "", nullMismatch);
+  check("filters are always respected", allRespected);
+}
+
+console.log("\nGenerated prompt quality");
+{
+  const rng = seeded(7);
+  const generated = [];
+  while (generated.length < 200) {
+    const prompt = pickWritingPrompt({}, rng);
+    if (prompt?.source === "generated") generated.push(prompt);
+  }
+
+  check("no double spaces", generated.every((p) => !p.text.includes("  ")), generated.find((p) => p.text.includes("  "))?.text);
+  check("starts with a capital", generated.every((p) => /^[A-Z]/.test(p.text)));
+  check("ends with a period", generated.every((p) => p.text.endsWith(".")));
+  check("no empty slots left unfilled", generated.every((p) => !p.text.includes("{")));
+  check("never generates poetry", generated.every((p) => p.genre !== "poetry" && p.length !== "poem"));
+
+  const unique = new Set(generated.map((p) => p.text));
+  check("draws are varied", unique.size > 190, `${unique.size}/200 unique`);
+}
+
+console.log("\nGenre-specific mixer pools");
+{
+  // The universal character pool is contemporary-realist. Sci-fi and cyberpunk
+  // must draw from their own pools or the results are nonsense.
+  for (const genre of ["scifi", "cyberpunk"]) {
+    const rng = seeded(11);
+    const generated = [];
+    let guard = 0;
+    while (generated.length < 60 && guard++ < 5000) {
+      const prompt = pickWritingPrompt({ genre }, rng);
+      if (prompt?.source === "generated") generated.push(prompt);
+    }
+
+    const characters = mixer.charactersByGenre[genre];
+    const settings = mixer.settingsByGenre[genre];
+
+    check(
+      `${genre}: every character comes from its own pool`,
+      generated.length > 0 && generated.every((p) => characters.some((c) => p.text.startsWith(c))),
+      generated.find((p) => !characters.some((c) => p.text.startsWith(c)))?.text,
+    );
+    check(
+      `${genre}: every setting comes from its own pool`,
+      generated.every((p) => settings.some((setting) => p.text.includes(setting))),
+      generated.find((p) => !settings.some((setting) => p.text.includes(setting)))?.text,
+    );
+    check(
+      `${genre}: no contemporary-realist characters leak in`,
+      generated.every((p) => !mixer.characters.some((c) => p.text.startsWith(c))),
+    );
+  }
+
+  check("every genre has a display label", GENRES.every((g) => typeof GENRE_LABELS[g] === "string"));
+  check("every genre has curated prompts", GENRES.every((g) => pickWritingPrompt({ genre: g }, seeded(5)) !== null));
+}
+
+console.log("\nThread names");
+{
+  check("short prompts pass through with a prefix", threadNameFor("A cursed object is trying its best.") === "✍️ A cursed object is trying its best.");
+
+  const long = "A tailor who remembers every client's measurements agrees to judge a competition they do not understand, during the last shift before a long holiday.";
+  const name = threadNameFor(long);
+  check("long prompts fit Discord's 100 character cap", name.length <= 100, `${name.length} chars`);
+  check("long prompts are elided", name.endsWith("…"));
+  // The visible body must be a genuine prefix of the original, cut where a word
+  // actually ends rather than mid-word.
+  const prefixLength = "✍️ ".length;
+  const body = name.slice(prefixLength, -1);
+  const nextChar = long.charAt(body.length);
+  check("elided body is a real prefix of the prompt", long.startsWith(body), body);
+  check("elision lands on a word boundary", /[\s,.;:]/.test(nextChar), `cut before ${JSON.stringify(nextChar)}`);
+
+  check("newlines are flattened", !threadNameFor("Line one.\n\nLine two.").includes("\n"));
+
+  // Every prompt in the pack must produce a legal thread name.
+  const rng = seeded(77);
+  let worst = 0;
+  for (let i = 0; i < 500; i++) {
+    const prompt = pickWritingPrompt({}, rng);
+    worst = Math.max(worst, threadNameFor(prompt.text).length);
+  }
+  check("no prompt in rotation exceeds the cap", worst <= 100, `longest was ${worst}`);
+}
+
+console.log("\nConstraints");
+{
+  const rng = seeded(3);
+  const withConstraint = Array.from({ length: DRAWS }, () => pickWritingPrompt({ constraint: true }, rng));
+  check("constraint is always attached when requested", withConstraint.every((p) => typeof p?.constraint === "string" && p.constraint.length > 0));
+  check("more than one constraint is in rotation", new Set(withConstraint.map((p) => p?.constraint)).size > 5);
+}
+
+console.log("\nDeterminism");
+{
+  const a = Array.from({ length: 20 }, ((rng) => () => pickWritingPrompt({}, rng))(seeded(99)));
+  const b = Array.from({ length: 20 }, ((rng) => () => pickWritingPrompt({}, rng))(seeded(99)));
+  check("same seed gives same sequence", JSON.stringify(a) === JSON.stringify(b));
+}
+
+console.log("\nImage sources");
+{
+  const adapterIds = IMAGE_SOURCES.map((source) => source.id).sort();
+  const choiceIds = IMAGE_SOURCE_CHOICES.map((choice) => choice.value).sort();
+  check("slash choices match the registered adapters", JSON.stringify(adapterIds) === JSON.stringify(choiceIds), `${adapterIds} vs ${choiceIds}`);
+
+  const unsplashWeight = IMAGE_SOURCES.find((s) => s.id === "unsplash").weight;
+  const museumWeight = IMAGE_SOURCES.filter((s) => s.id !== "unsplash").reduce((n, s) => n + s.weight, 0);
+  check("photography outweighs museums", unsplashWeight > museumWeight, `unsplash ${unsplashWeight} vs museums ${museumWeight}`);
+  check("museums are still reachable", museumWeight > 0);
+
+  const unsplash = IMAGE_SOURCES.find((source) => source.id === "unsplash");
+  check("Unsplash is off without a key", unsplash.isAvailable({}) === false);
+  check("Unsplash switches on with a key", unsplash.isAvailable({ UNSPLASH_ACCESS_KEY: "x" }) === true);
+  check("museum sources need no key", IMAGE_SOURCES.filter((s) => s.id !== "unsplash").every((s) => s.isAvailable({})));
+
+  // No network: every source is unreachable, so this must fail cleanly.
+  const noSources = await fetchImagePrompt({}, seeded(1), "definitely-not-a-source");
+  check("an unknown forced source yields null", noSources === null);
+}
+
+console.log("\nTitle normalisation");
+{
+  const long = "A Short History of General John Cabell Breckinridge, from the Histories of Generals series of booklets (N78) for Duke brand cigarettes";
+  const trimmed = displayTitle(long);
+  check("long museum titles are trimmed", trimmed.length <= 110 && trimmed.endsWith("…"), `${trimmed.length} chars`);
+  check("trimming keeps a real prefix", long.startsWith(trimmed.slice(0, -1)));
+  check("short titles pass through untouched", displayTitle("Soap Bubbles") === "Soap Bubbles");
+  check("missing titles become Untitled", displayTitle("") === "Untitled" && displayTitle(null) === "Untitled" && displayTitle(undefined) === "Untitled");
+  check("whitespace is flattened", displayTitle("Two   Women\non the Shore") === "Two Women on the Shore");
+  check("trimmed titles still fit a thread name", threadNameFor(displayTitle(long)).length <= 100);
+}
+
+console.log("\nWeighted ordering");
+{
+  const items = [{ id: "a", weight: 70 }, { id: "b", weight: 20 }, { id: "c", weight: 10 }];
+
+  const rng = seeded(4);
+  const orders = Array.from({ length: 600 }, () => weightedOrder(items, rng));
+  check("every source appears exactly once", orders.every((o) => o.length === 3 && new Set(o.map((i) => i.id)).size === 3));
+
+  const firstCounts = {};
+  for (const order of orders) firstCounts[order[0].id] = (firstCounts[order[0].id] ?? 0) + 1;
+  check("heavier weights are tried first more often",
+    firstCounts.a > firstCounts.b && firstCounts.b > firstCounts.c,
+    JSON.stringify(firstCounts));
+  check("the lightest source is still reachable", firstCounts.c > 0);
+
+  const x = weightedOrder(items, seeded(12));
+  const y = weightedOrder(items, seeded(12));
+  check("ordering is deterministic under a seed", JSON.stringify(x) === JSON.stringify(y));
+}
+
+console.log("\nPhotoshop challenges");
+{
+  const list = challenges.challenges;
+  check("challenge pack is non-trivial", list.length >= 20, `${list.length}`);
+  check("every challenge is a complete sentence", list.every((c) => /^[A-Z]/.test(c) && /[.!?]$/.test(c)));
+  check("challenges fit an embed heading", list.every((c) => c.length < 120));
+  check("no duplicate challenges", new Set(list).size === list.length);
+}
+
+console.log(`\n${passed} passed, ${failed} failed\n`);
+process.exit(failed === 0 ? 0 : 1);

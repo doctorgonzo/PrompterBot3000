@@ -1,0 +1,405 @@
+{
+  "$comment": "Curated writing prompts. genre: literary|speculative|horror|mystery|humor|poetry. length: flash|scene|poem. Additions welcome via PR.",
+  "prompts": [
+    {
+      "genre": "literary",
+      "length": "scene",
+      "text": "A woman returns the library book her mother checked out the week she died. It is nineteen years overdue. Write the conversation at the desk."
+    },
+    {
+      "genre": "literary",
+      "length": "scene",
+      "text": "Two estranged siblings have to divide their father's tools. Neither of them does the kind of work the tools were for."
+    },
+    {
+      "genre": "literary",
+      "length": "flash",
+      "text": "Write about the last person to leave a factory on its final day of operation, who is not sad."
+    },
+    {
+      "genre": "literary",
+      "length": "flash",
+      "text": "A man has been mispronouncing his own surname his entire adult life. Today someone corrects him."
+    },
+    {
+      "genre": "literary",
+      "length": "flash",
+      "text": "Describe a marriage using only the contents of a refrigerator, across four different years."
+    },
+    {
+      "genre": "literary",
+      "length": "scene",
+      "text": "Someone practices an apology in the car for twenty minutes. Write what they actually say when the door opens."
+    },
+    {
+      "genre": "literary",
+      "length": "scene",
+      "text": "A teenager works a summer job at the place their parent was fired from. Nobody at work knows."
+    },
+    {
+      "genre": "literary",
+      "length": "flash",
+      "text": "Write the moment a lifelong caretaker realizes they are no longer needed, and is relieved."
+    },
+    {
+      "genre": "literary",
+      "length": "scene",
+      "text": "Two neighbors have not spoken in eleven years over something neither can now remember exactly. One of them needs a favor."
+    },
+    {
+      "genre": "literary",
+      "length": "flash",
+      "text": "A translator encounters a word they cannot render, and it is not a difficult word."
+    },
+    {
+      "genre": "speculative",
+      "length": "flash",
+      "text": "Memory can be donated like blood. Write about a person who has given too much."
+    },
+    {
+      "genre": "speculative",
+      "length": "scene",
+      "text": "A city votes each spring on which parts of its own history to keep. Write about the archivist who loses."
+    },
+    {
+      "genre": "speculative",
+      "length": "flash",
+      "text": "Faster-than-light travel exists, but only works for cargo nobody is waiting on. Write the shipping industry that results."
+    },
+    {
+      "genre": "speculative",
+      "length": "flash",
+      "text": "Every person is born knowing one true fact about a stranger they will never meet. Write about someone who finally meets theirs."
+    },
+    {
+      "genre": "speculative",
+      "length": "scene",
+      "text": "A generation ship's third generation votes on whether to wake the crew that launched it."
+    },
+    {
+      "genre": "speculative",
+      "length": "flash",
+      "text": "Write about the last human employee at a company that no longer requires humans, whose job is genuinely necessary."
+    },
+    {
+      "genre": "speculative",
+      "length": "scene",
+      "text": "Grief has been treatable as a disease for a decade. Write the first person to publicly refuse the cure."
+    },
+    {
+      "genre": "speculative",
+      "length": "flash",
+      "text": "An AI is asked to write the eulogy for its own creator, and gets one detail deliberately wrong."
+    },
+    {
+      "genre": "speculative",
+      "length": "scene",
+      "text": "Colonists discover their new world's seasons are eleven years long, and they arrived in spring."
+    },
+    {
+      "genre": "speculative",
+      "length": "flash",
+      "text": "Write about a repair technician for a technology nobody remembers the purpose of, which everyone still funds."
+    },
+    {
+      "genre": "horror",
+      "length": "flash",
+      "text": "Something in the house has learned to imitate the sound of someone coming home."
+    },
+    {
+      "genre": "horror",
+      "length": "scene",
+      "text": "A woman notices the family photographs are being replaced, one per week, with nearly identical versions."
+    },
+    {
+      "genre": "horror",
+      "length": "scene",
+      "text": "Write about a small town where everyone is unfailingly kind, and it is getting worse."
+    },
+    {
+      "genre": "horror",
+      "length": "flash",
+      "text": "A night watchman's rounds take fifty-two minutes. Tonight they take forty-nine."
+    },
+    {
+      "genre": "horror",
+      "length": "scene",
+      "text": "Someone finds a door in their apartment that was always there, according to the lease, the landlord, and their partner."
+    },
+    {
+      "genre": "horror",
+      "length": "flash",
+      "text": "Write about the thing that lives in the lake, from the perspective of the people who feed it, who are not afraid."
+    },
+    {
+      "genre": "horror",
+      "length": "scene",
+      "text": "A child's imaginary friend has begun asking questions that suggest it is taking notes."
+    },
+    {
+      "genre": "horror",
+      "length": "flash",
+      "text": "Every mirror in the building shows the room one second late."
+    },
+    {
+      "genre": "horror",
+      "length": "scene",
+      "text": "Write about a support group where every member describes the same event, which none of them attended."
+    },
+    {
+      "genre": "horror",
+      "length": "flash",
+      "text": "The neighbors' dog has not barked in six days, and the neighbors seem happier."
+    },
+    {
+      "genre": "mystery",
+      "length": "scene",
+      "text": "A locksmith is called to open a door and recognizes their own work from thirty years ago."
+    },
+    {
+      "genre": "mystery",
+      "length": "scene",
+      "text": "Write a detective who solves the case in the first ten minutes, and spends the rest of the story deciding whether to say so."
+    },
+    {
+      "genre": "mystery",
+      "length": "flash",
+      "text": "Every witness gives the same account, word for word, and none of them know each other."
+    },
+    {
+      "genre": "mystery",
+      "length": "flash",
+      "text": "A body is found with a train ticket to a station that closed in 1974."
+    },
+    {
+      "genre": "mystery",
+      "length": "scene",
+      "text": "Someone has been quietly correcting the errors on a small museum's placards for years. Write the curator who catches them."
+    },
+    {
+      "genre": "mystery",
+      "length": "flash",
+      "text": "Write about a missing person who has left a trail clearly meant to be followed, and clearly meant to take a long time."
+    },
+    {
+      "genre": "mystery",
+      "length": "flash",
+      "text": "An accountant finds a rounding error that has been running, deliberately, for two decades."
+    },
+    {
+      "genre": "mystery",
+      "length": "scene",
+      "text": "The security footage shows the room empty for four minutes. Everyone who was in it remembers those four minutes differently."
+    },
+    {
+      "genre": "mystery",
+      "length": "flash",
+      "text": "Write about the person who reports a crime that has not happened yet, and is right."
+    },
+    {
+      "genre": "mystery",
+      "length": "flash",
+      "text": "A letter arrives addressed to the house, not to anyone in it."
+    },
+    {
+      "genre": "humor",
+      "length": "flash",
+      "text": "Write the minutes of a homeowners' association meeting that escalates into a schism."
+    },
+    {
+      "genre": "humor",
+      "length": "scene",
+      "text": "A very serious professional must explain their job to a five-year-old who keeps asking why, and eventually cracks."
+    },
+    {
+      "genre": "humor",
+      "length": "scene",
+      "text": "Two people who despise each other are stuck co-hosting a podcast that is finally succeeding."
+    },
+    {
+      "genre": "humor",
+      "length": "flash",
+      "text": "A man has been faking a mild allergy for eight years and can no longer stop."
+    },
+    {
+      "genre": "humor",
+      "length": "flash",
+      "text": "A cursed object is genuinely trying its best."
+    },
+    {
+      "genre": "humor",
+      "length": "flash",
+      "text": "Write a customer service exchange in which the customer is completely correct and it changes nothing."
+    },
+    {
+      "genre": "humor",
+      "length": "flash",
+      "text": "Someone's autocorrect has developed opinions about their relationship."
+    },
+    {
+      "genre": "humor",
+      "length": "scene",
+      "text": "A bakery and a funeral home share a wall, a parking lot, and increasingly, a customer base."
+    },
+    {
+      "genre": "humor",
+      "length": "scene",
+      "text": "Write the worst possible person to be trapped in an elevator with, from that person's point of view, in which they are lovely."
+    },
+    {
+      "genre": "humor",
+      "length": "flash",
+      "text": "A small town's tourism board must rebrand around the only thing that has ever happened there."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write a poem that is a list of everything you would have to explain to make one photograph make sense."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write about winter light in a room, without naming the season, the light, or the room."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "A poem whose last line is identical to its first, and has changed meaning."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write about a body of water you know well as though describing a person's face."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write a poem entirely in questions, none of which are rhetorical."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Take the most boring object within arm's reach. Write it as though it survived something."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write about a hand doing work the person is no longer paying attention to."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "A poem about a place that has been renamed, using only the old name's associations."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write about leaving, in which nobody leaves."
+    },
+    {
+      "genre": "poetry",
+      "length": "poem",
+      "text": "Write a poem made of things overheard, arranged so that they argue."
+    },
+    {
+      "genre": "scifi",
+      "length": "scene",
+      "text": "First contact goes perfectly. Write the second contact."
+    },
+    {
+      "genre": "scifi",
+      "length": "scene",
+      "text": "A terraforming crew discovers the planet was terraformed once before, badly."
+    },
+    {
+      "genre": "scifi",
+      "length": "scene",
+      "text": "Write the engineer who has to explain that the mission cannot be sped up, to people who will die waiting."
+    },
+    {
+      "genre": "scifi",
+      "length": "flash",
+      "text": "A probe returns after two centuries carrying nothing it was sent for."
+    },
+    {
+      "genre": "scifi",
+      "length": "flash",
+      "text": "Write about the first person born off Earth who has no interest in ever visiting."
+    },
+    {
+      "genre": "scifi",
+      "length": "flash",
+      "text": "The signal repeats every eleven hours. It has been doing so since before there was anyone to hear it."
+    },
+    {
+      "genre": "scifi",
+      "length": "scene",
+      "text": "A ship's doctor must decide which specialist to wake, knowing the rest may never be."
+    },
+    {
+      "genre": "scifi",
+      "length": "scene",
+      "text": "Write about a species whose written language cannot express the future tense, and the diplomat assigned to them."
+    },
+    {
+      "genre": "scifi",
+      "length": "flash",
+      "text": "Gravity on the station has been off by two percent for a year and nobody reported it."
+    },
+    {
+      "genre": "scifi",
+      "length": "flash",
+      "text": "Write the last transmission from a colony that is completely fine."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "flash",
+      "text": "A courier realizes the package they have carried across three districts is addressed to themselves."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "scene",
+      "text": "Write about the last independent repair shop in a city where repair is illegal."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "flash",
+      "text": "Someone's implant has begun showing ads only they can see, and one of them is correct."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "scene",
+      "text": "A corporate arbitration clerk finds the clause that would free everyone, and it is three lines long."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "scene",
+      "text": "Write about a street doctor who accepts payment only in favors, and is owed far too many."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "flash",
+      "text": "The city's surveillance network has developed a preference for one particular citizen."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "flash",
+      "text": "A woman sells the rights to her own face and watches it get worse."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "scene",
+      "text": "Write the night shift at a data haven built inside a decommissioned grain elevator."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "flash",
+      "text": "Someone is hired to forget something professionally, and the job goes well."
+    },
+    {
+      "genre": "cyberpunk",
+      "length": "scene",
+      "text": "A gang war is settled entirely through competing service outages."
+    }
+  ]
+}

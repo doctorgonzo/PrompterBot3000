@@ -1,0 +1,22 @@
+{
+  "name": "autoprompterbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Discord bot posting photoshop and writing prompts for the Madison, WI artist community",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "register": "node scripts/register-commands.mjs",
+    "typecheck": "tsc --noEmit",
+    "tail": "wrangler tail",
+    "test": "node scripts/test-units.mjs && node scripts/smoke-test.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "sources": "node scripts/sources.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260818.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.123.0"
+  }
+}

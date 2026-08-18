@@ -1,0 +1,21 @@
+# Copy to .dev.vars and fill in. .dev.vars is gitignored — never commit real values.
+# All four come from https://discord.com/developers/applications
+
+# General Information -> Application ID
+DISCORD_APPLICATION_ID=
+
+# General Information -> Public Key
+DISCORD_PUBLIC_KEY=
+
+# Bot -> Token (Reset Token to reveal it; it is only shown once)
+DISCORD_BOT_TOKEN=
+
+# Optional: enables the Unsplash image source for /photoshop. Without it the
+# museum sources still work. Get one at https://unsplash.com/oauth/applications
+# (this is the "Access Key", not the Secret Key).
+UNSPLASH_ACCESS_KEY=
+
+# Optional but recommended while developing: right-click your server ->
+# Copy Server ID (needs Developer Mode on). Scopes commands to one server so
+# they register instantly instead of taking up to an hour.
+DISCORD_GUILD_ID=

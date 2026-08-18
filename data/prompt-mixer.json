@@ -1,0 +1,291 @@
+{
+  "$comment": "Combinatorial prompt parts. Composed as '{character} {situation}, {setting}.' Characters must be capitalized noun phrases; situations third-person-singular verb phrases; settings prepositional phrases. Keep that grammar and any combination reads correctly. charactersByGenre/settingsByGenre override the universal pools for genres where the contemporary-realist defaults would not make sense.",
+  "characters": [
+    "A night-shift baker",
+    "A retired ice fisherman",
+    "A substitute teacher on their last assignment",
+    "A locksmith who has stopped taking new clients",
+    "A woman who reads utility meters",
+    "A community theater director",
+    "A long-haul trucker three days from home",
+    "A hospice volunteer",
+    "A beekeeper whose hives are failing",
+    "A wedding photographer who no longer believes in it",
+    "A man who inherited a business he does not understand",
+    "A church organist",
+    "A park ranger in the off-season",
+    "A pawnshop clerk",
+    "A woman who tests municipal water",
+    "A former child actor now in their forties",
+    "A crossing guard",
+    "A pianist with an injured hand",
+    "An obituary writer",
+    "A man who repairs pinball machines",
+    "A woman who has moved eleven times in nine years",
+    "A bartender at a hotel near an airport",
+    "A tailor who remembers every client's measurements",
+    "A night janitor at an aquarium"
+  ],
+  "charactersByGenre": {
+    "scifi": [
+      "A ship's hydroponics technician",
+      "A third-shift reactor monitor",
+      "A colony surveyor",
+      "A pilot who has not flown in four years",
+      "A xenolinguist on their first posting",
+      "A cargo handler on a long-haul freighter",
+      "A station medic",
+      "A terraforming crew chief",
+      "A navigator raised entirely aboard ship",
+      "A quarantine officer"
+    ],
+    "cyberpunk": [
+      "A courier with a bad knee",
+      "A street doctor working out of a converted laundromat",
+      "A data broker who deals only in obsolete formats",
+      "A corporate arbitration clerk",
+      "A security contractor between contracts",
+      "A woman who repairs implants without a license",
+      "A night-shift server farm technician",
+      "A fixer who has outlived their reputation",
+      "A former corporate lawyer now doing tenant defense",
+      "A bartender who launders favors instead of money"
+    ]
+  },
+  "situations": [
+    {
+      "genre": "literary",
+      "text": "finds a letter addressed to someone who died a decade ago"
+    },
+    {
+      "genre": "literary",
+      "text": "is asked to give a toast they have no business giving"
+    },
+    {
+      "genre": "literary",
+      "text": "realizes they have been telling a story wrong for years"
+    },
+    {
+      "genre": "literary",
+      "text": "agrees to one last favor for a person they have every reason to refuse"
+    },
+    {
+      "genre": "literary",
+      "text": "discovers they were not the reason something ended"
+    },
+    {
+      "genre": "literary",
+      "text": "has to defend a decision they cannot explain and still believe in"
+    },
+    {
+      "genre": "literary",
+      "text": "returns to a place expecting it to feel smaller, and it does not"
+    },
+    {
+      "genre": "speculative",
+      "text": "is offered a job that requires forgetting the previous one"
+    },
+    {
+      "genre": "speculative",
+      "text": "receives instructions from a version of themselves that chose differently"
+    },
+    {
+      "genre": "speculative",
+      "text": "turns out to be the last person certified to operate a machine nobody will admit is still running"
+    },
+    {
+      "genre": "speculative",
+      "text": "finds their own name in a record that predates them"
+    },
+    {
+      "genre": "speculative",
+      "text": "must decide what a settlement is allowed to remember about how it began"
+    },
+    {
+      "genre": "speculative",
+      "text": "is contacted by something patient enough to wait a lifetime for an answer"
+    },
+    {
+      "genre": "horror",
+      "text": "begins hearing their own voice from the next room"
+    },
+    {
+      "genre": "horror",
+      "text": "notices that a routine they have kept for years has been subtly altered"
+    },
+    {
+      "genre": "horror",
+      "text": "is welcomed by name somewhere they have never been"
+    },
+    {
+      "genre": "horror",
+      "text": "finds evidence of someone living very carefully inside their house"
+    },
+    {
+      "genre": "horror",
+      "text": "realizes the photographs were taken from angles where nobody stood"
+    },
+    {
+      "genre": "horror",
+      "text": "is warned by a stranger about one specific date"
+    },
+    {
+      "genre": "mystery",
+      "text": "is given a key with no explanation and no matching lock"
+    },
+    {
+      "genre": "mystery",
+      "text": "recognizes their own handwriting on something they never wrote"
+    },
+    {
+      "genre": "mystery",
+      "text": "is the only witness who noticed the thing everyone else missed"
+    },
+    {
+      "genre": "mystery",
+      "text": "is asked to identify a body and cannot work out why they were called"
+    },
+    {
+      "genre": "mystery",
+      "text": "finds a payment that has been arriving monthly for eleven years"
+    },
+    {
+      "genre": "mystery",
+      "text": "discovers a room in a building they have worked in for a decade"
+    },
+    {
+      "genre": "humor",
+      "text": "is mistaken for an expert and decides to commit"
+    },
+    {
+      "genre": "humor",
+      "text": "must maintain a lie that has become structurally load-bearing"
+    },
+    {
+      "genre": "humor",
+      "text": "is nominated for an award they actively campaigned against"
+    },
+    {
+      "genre": "humor",
+      "text": "agrees to judge a competition they do not understand"
+    },
+    {
+      "genre": "humor",
+      "text": "has to host an event after everyone more qualified has quit"
+    },
+    {
+      "genre": "scifi",
+      "text": "is the only crew member awake for the course correction"
+    },
+    {
+      "genre": "scifi",
+      "text": "receives a transmission that has been in transit longer than the colony has existed"
+    },
+    {
+      "genre": "scifi",
+      "text": "must explain a fatal error to people who cannot be told the truth"
+    },
+    {
+      "genre": "scifi",
+      "text": "finds a component aboard that appears on no manifest"
+    },
+    {
+      "genre": "scifi",
+      "text": "is asked to certify that a world is uninhabited"
+    },
+    {
+      "genre": "scifi",
+      "text": "discovers the mission's original orders have been quietly revised"
+    },
+    {
+      "genre": "cyberpunk",
+      "text": "is offered a contract that pays in something other than money"
+    },
+    {
+      "genre": "cyberpunk",
+      "text": "discovers their own credentials were used somewhere they have never been"
+    },
+    {
+      "genre": "cyberpunk",
+      "text": "is told their debt has been bought by someone who does not want it repaid"
+    },
+    {
+      "genre": "cyberpunk",
+      "text": "finds a piece of hardware that predates the network and still works"
+    },
+    {
+      "genre": "cyberpunk",
+      "text": "is ordered to delete a record that they wrote"
+    },
+    {
+      "genre": "cyberpunk",
+      "text": "realizes the building's system has started making exceptions for them"
+    }
+  ],
+  "settings": [
+    "in a lakeside town during the coldest week in forty years",
+    "in a city built on an isthmus, in the last week before the lakes freeze",
+    "at a farmers market on the morning it is being shut down",
+    "in a rented house with one room the landlord asked them not to use",
+    "during a power outage that has lasted longer than anyone expected",
+    "in the dead week between Christmas and New Year's",
+    "at a county fairgrounds out of season",
+    "at a highway motel with a permanently lit VACANCY sign",
+    "in a university town in August, before anyone comes back",
+    "on the third consecutive day of rain",
+    "in a neighborhood where every house was built by the same builder",
+    "during a heat wave, in a building with no air conditioning",
+    "in a hospital waiting room at four in the morning",
+    "at a supper club that has not changed its menu since 1974",
+    "on a frozen lake dotted with ice shanties",
+    "in a town whose only employer has just announced it is leaving",
+    "during the last shift before a long holiday",
+    "in a house already half packed into boxes",
+    "at a state capitol on a day when nothing is happening",
+    "in a bar where everyone knows each other and nobody is friends"
+  ],
+  "settingsByGenre": {
+    "scifi": [
+      "aboard a freighter eleven months from the nearest port",
+      "on a station where the artificial day is nineteen hours long",
+      "in a colony's first winter, which will last four years",
+      "on the night side of a tidally locked world",
+      "during the six weeks it takes a message to reach home",
+      "in a docking ring already scheduled for decommissioning",
+      "aboard a survey vessel that has found nothing for two years",
+      "in a habitat built for twice as many people as live there",
+      "during a course correction nobody voted on",
+      "on a world where the surveying is finished and the answer is unwelcome"
+    ],
+    "cyberpunk": [
+      "in a district where power is metered by the minute",
+      "on the ninetieth floor of a building with no working elevator above sixty",
+      "in a market that exists for four hours a night",
+      "in a squat wired into someone else's utilities",
+      "during a rolling blackout everyone agrees is deliberate",
+      "in a server farm cooled by lake water it is not licensed to use",
+      "in a neighborhood the maps have quietly stopped updating",
+      "under a transit line that has not run in a decade",
+      "in the last block of the city with no camera coverage",
+      "in a company town where rent is deducted before wages"
+    ]
+  },
+  "constraints": [
+    "Write it without using the word \"remember\".",
+    "Tell it entirely in dialogue.",
+    "Do not name the central emotion anywhere in the piece.",
+    "Write it in second person.",
+    "Begin at the end and move backwards.",
+    "Use no adverbs.",
+    "Let the narrator be wrong about something the reader can see.",
+    "Begin every paragraph with a concrete object.",
+    "Write it as a single unbroken sentence.",
+    "Include a list of at least six things.",
+    "Do not describe anyone's face.",
+    "Set the entire piece in one room.",
+    "Write it as a document: a form, a report, a set of instructions.",
+    "End on an image, not a line of dialogue.",
+    "Nobody may cry.",
+    "The weather must change exactly once."
+  ]
+}
