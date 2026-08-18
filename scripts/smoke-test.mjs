@@ -38,6 +38,7 @@ function resetMock(overrides = {}) {
 }
 
 const MOCK_IMAGE = "https://images.example.test/mock.jpg";
+const MOCK_IMAGE_SMALL = "https://images.example.test/mock-small.jpg";
 
 /** Canned upstream responses for the three image sources. */
 function imageSourceResponse(url) {
@@ -45,7 +46,7 @@ function imageSourceResponse(url) {
   if (url.startsWith("/met/objects/")) {
     return {
       isPublicDomain: true,
-      primaryImageSmall: MOCK_IMAGE,
+      primaryImageSmall: MOCK_IMAGE_SMALL,
       primaryImage: MOCK_IMAGE,
       title: "Mock Object",
       artistDisplayName: "A Painter",
@@ -369,6 +370,14 @@ async function runTests() {
 
   await settle();
 
+  resetMock();
+  await post(slashCommand("photoshop", [stringOption("source", "met")]));
+  edit = await waitForRequest(isEdit);
+  check("the Met uses its full-size image, not the ~600px derivative",
+    JSON.parse(edit?.body ?? "{}").embeds?.[0]?.image?.url === MOCK_IMAGE,
+    JSON.parse(edit?.body ?? "{}").embeds?.[0]?.image?.url);
+
+  await settle();
   resetMock();
   await post(slashCommand("photoshop", [stringOption("source", "unsplash")]));
   edit = await waitForRequest(isEdit);

@@ -53,9 +53,10 @@ export const met: ImageSource = {
 
       if (!object?.isPublicDomain) continue;
 
-      // Prefer the smaller derivative: originals run to many megabytes and
-      // Discord's embed proxy gives up on them.
-      const imageUrl = object.primaryImageSmall || object.primaryImage;
+      // Prefer the full derivative. The small one is capped near 600px, which
+      // Discord upscales into a visibly blurry embed. The Met caps "primary" at
+      // 4000px and a few megabytes, comfortably inside Discord's limits.
+      const imageUrl = object.primaryImage || object.primaryImageSmall;
       if (!imageUrl) continue;
 
       const creator = object.artistDisplayName || "Unknown artist";
