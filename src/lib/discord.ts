@@ -252,6 +252,29 @@ export function actorName(interaction: Interaction): string | undefined {
   return interaction.member?.user.username ?? interaction.user?.username;
 }
 
+/** Posts directly to a channel. Used by the scheduled daily prompt, which has
+ * no interaction to reply to. */
+export async function postMessage(
+  env: Env,
+  channelId: string,
+  payload: Record<string, unknown>,
+): Promise<DiscordMessage | null> {
+  const response = await fetch(`${apiBase(env)}/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    console.error("postMessage failed", channelId, response.status, await response.text());
+    return null;
+  }
+  return (await response.json()) as DiscordMessage;
+}
+
 /** Deletes a message. Used by /reroll to retract a prompt it is replacing. */
 export async function deleteMessage(
   env: Env,

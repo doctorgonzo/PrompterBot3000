@@ -11,7 +11,7 @@ server to babysit.
 
 ## Status
 
-**Phase 4 complete.** Live commands:
+**Phases 0–4 complete.** Live commands:
 
 | Command | Who | What it does |
 |---|---|---|
@@ -19,6 +19,7 @@ server to babysit.
 | `/writingprompt [genre] [length] [constraint] [thread]` | Anyone | Posts a writing prompt |
 | `/photoshop [source] [thread]` | Anyone | Posts an image as a Photoshop challenge |
 | `/promptconfig [source] [enabled]` | Manage Server | View or change which image sources this server uses |
+| `/daily [kind] [channel] [hour]` | Manage Server | Schedule a daily prompt |
 | `/reroll` | Manage Messages | Replaces the most recent prompt in the channel |
 
 The two moderator commands are gated with `default_member_permissions`, so
@@ -97,6 +98,35 @@ intent.
 
 If nothing can be generated to replace it, the original is left alone rather
 than deleted into an empty gap.
+
+### `/daily`
+
+Schedules a prompt to post itself every day, with no one running a command.
+
+```
+/daily kind:Alternate between both channel:#prompts hour:10
+```
+
+- **kind** — writing prompts, Photoshop challenges, alternating, or off
+- **channel** — where it posts
+- **hour** — 0–23 in Madison local time, default 10
+
+Run it with no options to see the current schedule. The daily post is threaded
+like any other, and `/reroll` works on it.
+
+**Why hourly rather than one fixed cron.** The Worker's cron fires every hour and
+each server posts once, at its own local hour. Scheduling against
+`America/Chicago` rather than a fixed UTC time means the post doesn't shift by an
+hour when daylight saving changes — a single `0 15 * * *` cron would be 10am in
+summer and 9am in winter. It also lets different servers pick different times.
+
+A missed hour catches up later the same day, so a brief outage delays the post
+rather than skipping it. A failed post doesn't consume the day either — it
+retries on the next hourly run. `lastPostedDate` is what keeps any of that from
+posting twice.
+
+Setting a schedule for an hour that has already passed today starts tomorrow,
+rather than firing a surprise post within the hour.
 
 ### Repeat suppression
 
@@ -296,11 +326,16 @@ touch them.
 npm test
 ```
 
-Two suites, 120 checks. `scripts/test-units.mjs` covers prompt selection and
+Two suites, 160 checks. `scripts/test-units.mjs` covers prompt selection and
 thread naming against the real data files — every genre/length combination,
 filter correctness, generated-text grammar, genre pool isolation, and
 determinism under a seeded RNG — so a bad edit to `data/*.json` fails here
 rather than in the channel.
+
+The daily scheduler is covered by driving `runDailyPrompts` directly against an
+in-memory KV and a stand-in Discord — it takes an explicit instant, so DST
+boundaries, catch-up, double-post prevention, and failure retry are all testable
+without waiting on a clock.
 
 `scripts/smoke-test.mjs` boots a real Worker, generates a throwaway Ed25519 keypair, and signs requests
 exactly the way Discord does — including negative cases (tampered signature,
@@ -331,6 +366,7 @@ src/
   lib/
     verify.ts            Ed25519 signature verification (WebCrypto)
     discord.ts           API types and response helpers
+    daily.ts             Scheduled daily prompt: timing rules and runner
     prompts.ts           Prompt selection: curated pack + mixer
     prompt-builders.ts   Builds the message for each prompt kind
     deliver.ts           Post-publish work: seen-marking, thread, reroll pointer
@@ -351,6 +387,7 @@ src/
     writingprompt.ts     /writingprompt
     photoshop.ts         /photoshop
     promptconfig.ts      /promptconfig
+    daily.ts             /daily
     reroll.ts            /reroll
 scripts/
   register-commands.mjs  Pushes definitions to Discord
@@ -410,7 +447,7 @@ call the network should return `defer()` immediately, do the slow work inside
       and Unsplash, with attribution and source fallback
 - [x] **Phase 2.5** — Auto-threading (pulled forward from Phase 3)
 - [x] **Phase 4** — Mod config, source blocklist, `/reroll`, repeat suppression
-- [ ] **Phase 3** — Scheduled daily prompt via cron
+- [x] **Phase 3** — Scheduled daily prompt via cron, per-server and DST-aware
 - [ ] **Phase 5** — Submission gallery, hall of fame, weekly recap
 
 ### Image sourcing policy

@@ -7,7 +7,10 @@
 
 export const CHAT_INPUT = 1;
 const STRING_OPTION = 3;
+const INTEGER_OPTION = 4;
 const BOOLEAN_OPTION = 5;
+const CHANNEL_OPTION = 7;
+const GUILD_TEXT_CHANNEL = 0;
 
 /** Single source of truth: prompt filtering and the slash choices both use these. */
 export const GENRES = [
@@ -143,6 +146,44 @@ export const PROMPT_CONFIG_COMMAND = {
   ],
 };
 
+export const DAILY_KIND_CHOICES = [
+  { name: "Writing prompts", value: "writing" },
+  { name: "Photoshop challenges", value: "photoshop" },
+  { name: "Alternate between both", value: "alternate" },
+  { name: "Off", value: "off" },
+];
+
+export const DAILY_COMMAND = {
+  name: "daily",
+  description: "Schedule a daily prompt for this server",
+  type: CHAT_INPUT,
+  default_member_permissions: MANAGE_GUILD,
+  options: [
+    {
+      name: "kind",
+      description: "What to post each day, or Off to stop",
+      type: STRING_OPTION,
+      required: false,
+      choices: DAILY_KIND_CHOICES,
+    },
+    {
+      name: "channel",
+      description: "Which channel to post in",
+      type: CHANNEL_OPTION,
+      required: false,
+      channel_types: [GUILD_TEXT_CHANNEL],
+    },
+    {
+      name: "hour",
+      description: "Hour of day in Madison time, 0-23 (default 10)",
+      type: INTEGER_OPTION,
+      required: false,
+      min_value: 0,
+      max_value: 23,
+    },
+  ],
+};
+
 export const REROLL_COMMAND = {
   name: "reroll",
   description: "Replace the most recent prompt in this channel with a new one",
@@ -155,5 +196,6 @@ export const COMMAND_DEFINITIONS = [
   WRITING_PROMPT_COMMAND,
   PHOTOSHOP_COMMAND,
   PROMPT_CONFIG_COMMAND,
+  DAILY_COMMAND,
   REROLL_COMMAND,
 ];

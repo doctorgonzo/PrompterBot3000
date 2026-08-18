@@ -11,6 +11,8 @@ import { threadNameFor } from "../src/lib/threads.ts";
 import { weightedOrder } from "../src/lib/random.ts";
 import { IMAGE_SOURCES, fetchImagePrompt, selectSources, drawFrom } from "../src/lib/images/index.ts";
 import { shortHash } from "../src/lib/store.ts";
+import { localTime, shouldPostNow, nextKind, DEFAULT_DAILY_HOUR, runDailyPrompts } from "../src/lib/daily.ts";
+import { createServer } from "node:http";
 import { displayTitle } from "../src/lib/images/types.ts";
 import challenges from "../data/photoshop-challenges.json" with { type: "json" };
 import { GENRES, LENGTHS, GENRE_LABELS, IMAGE_SOURCE_CHOICES } from "../src/commands/definitions.ts";
@@ -277,6 +279,167 @@ console.log("\nKey hashing");
     hashes.add(shortHash(text));
   }
   check("no collisions across the prompt pool", hashes.size === texts.size, `${texts.size} texts -> ${hashes.size} hashes`);
+}
+
+console.log("\nDaily scheduling: local time");
+{
+  const at = (iso) => localTime(new Date(iso));
+
+  check("summer resolves to CDT", at("2026-07-01T15:00:00Z").hour === 10, JSON.stringify(at("2026-07-01T15:00:00Z")));
+  check("winter resolves to CST", at("2026-01-15T15:00:00Z").hour === 9, JSON.stringify(at("2026-01-15T15:00:00Z")));
+  // The whole reason for scheduling on local hour: a fixed UTC cron would
+  // drift by an hour between these two dates.
+  check("the same UTC hour differs across DST",
+    at("2026-07-01T15:00:00Z").hour !== at("2026-01-15T15:00:00Z").hour);
+
+  check("midnight is hour 0, never 24", at("2026-07-01T05:00:00Z").hour === 0);
+  check("the date rolls with local time, not UTC", at("2026-07-01T04:59:00Z").date === "2026-06-30");
+  check("dates are ISO formatted", /^\d{4}-\d{2}-\d{2}$/.test(at("2026-01-15T15:00:00Z").date));
+}
+
+console.log("\nDaily scheduling: when to post");
+{
+  const config = (over = {}) => ({ guildId: "g", channelId: "c", kind: "writing", hour: 10, ...over });
+
+  check("not yet due", shouldPostNow(config(), { date: "2026-07-01", hour: 9 }) === false);
+  check("due on the hour", shouldPostNow(config(), { date: "2026-07-01", hour: 10 }) === true);
+  // Catch-up: a missed or failed run still posts later the same day.
+  check("a missed hour catches up later", shouldPostNow(config(), { date: "2026-07-01", hour: 14 }) === true);
+  check("already posted today stays quiet",
+    shouldPostNow(config({ lastPostedDate: "2026-07-01" }), { date: "2026-07-01", hour: 14 }) === false);
+  check("yesterday's post does not block today",
+    shouldPostNow(config({ lastPostedDate: "2026-06-30" }), { date: "2026-07-01", hour: 10 }) === true);
+  // 2am does not exist on spring-forward day; >= is what saves an hour:2 server.
+  check("a nonexistent DST hour still posts",
+    shouldPostNow(config({ hour: 2 }), localTime(new Date("2026-03-08T08:00:00Z"))) === true);
+
+  check("the default hour is reasonable", DEFAULT_DAILY_HOUR >= 6 && DEFAULT_DAILY_HOUR <= 20);
+}
+
+console.log("\nDaily scheduling: kind rotation");
+{
+  check("a fixed kind is returned as-is", nextKind({ kind: "writing" }) === "writing" && nextKind({ kind: "photoshop" }) === "photoshop");
+  check("alternate follows writing with photoshop", nextKind({ kind: "alternate", lastKind: "writing" }) === "photoshop");
+  check("alternate follows photoshop with writing", nextKind({ kind: "alternate", lastKind: "photoshop" }) === "writing");
+  check("alternate starts with writing", nextKind({ kind: "alternate" }) === "writing");
+
+  // Rotation must not stall on either kind.
+  let state = { kind: "alternate" };
+  const seen = [];
+  for (let i = 0; i < 6; i++) {
+    const kind = nextKind(state);
+    seen.push(kind);
+    state = { kind: "alternate", lastKind: kind };
+  }
+  check("rotation alternates indefinitely", seen.join(",") === "writing,photoshop,writing,photoshop,writing,photoshop", seen.join(","));
+}
+
+console.log("\nDaily scheduling: posting");
+{
+  /** Minimal in-memory stand-in for Workers KV. */
+  const fakeKv = () => {
+    const map = new Map();
+    return {
+      map,
+      async get(key, type) {
+        const raw = map.get(key);
+        if (raw === undefined) return null;
+        return type === "json" ? JSON.parse(raw) : raw;
+      },
+      async put(key, value) { map.set(key, value); },
+      async delete(key) { map.delete(key); },
+      async list({ prefix = "" } = {}) {
+        return { keys: [...map.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true };
+      },
+    };
+  };
+
+  const requests = [];
+  let postStatus = 200;
+  const discord = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      requests.push({ method: req.method, url: req.url, body });
+      if (req.url.endsWith("/messages") && postStatus !== 200) {
+        res.writeHead(postStatus, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ message: "nope" }));
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ id: "daily-msg", channel_id: "daily-chan" }));
+    });
+  });
+  const port = 8790;
+  await new Promise((resolve) => discord.listen(port, resolve));
+
+  const makeEnv = (kv) => ({
+    DISCORD_API_BASE: `http://localhost:${port}`,
+    DISCORD_APPLICATION_ID: "app",
+    DISCORD_BOT_TOKEN: "token",
+    PROMPT_STATE: kv,
+  });
+
+  // 15:00 UTC on a summer day is 10:00 in Madison.
+  const dueAt = new Date("2026-07-01T15:00:00Z");
+  const config = (over = {}) => JSON.stringify({ guildId: "g1", channelId: "daily-chan", kind: "writing", hour: 10, ...over });
+
+  let kv = fakeKv();
+  kv.map.set("daily:g1", config());
+  requests.length = 0;
+  let posted = await runDailyPrompts(makeEnv(kv), dueAt);
+
+  check("a due server gets a post", posted === 1, `posted ${posted}`);
+  const sent = requests.find((r) => r.method === "POST" && r.url === "/channels/daily-chan/messages");
+  check("it posts to the configured channel", Boolean(sent), requests.map((r) => `${r.method} ${r.url}`).join(" | "));
+  check("the post carries a prompt embed", Boolean(JSON.parse(sent?.body ?? "{}").embeds?.[0]?.description));
+  check("a thread is opened on it", requests.some((r) => r.url.endsWith("/threads")));
+  check("the day is recorded", JSON.parse(kv.map.get("daily:g1")).lastPostedDate === "2026-07-01");
+  check("the prompt is remembered for /reroll", Boolean(kv.map.get("last:daily-chan")));
+
+  // Running again the same day must not double-post.
+  requests.length = 0;
+  posted = await runDailyPrompts(makeEnv(kv), new Date("2026-07-01T18:00:00Z"));
+  check("a second run the same day posts nothing", posted === 0 && requests.length === 0, `posted ${posted}`);
+
+  // The next day it posts again.
+  posted = await runDailyPrompts(makeEnv(kv), new Date("2026-07-02T15:00:00Z"));
+  check("the next day posts again", posted === 1);
+
+  // Not yet due.
+  kv = fakeKv();
+  kv.map.set("daily:g1", config({ hour: 20 }));
+  requests.length = 0;
+  posted = await runDailyPrompts(makeEnv(kv), dueAt);
+  check("a server whose hour has not arrived stays quiet", posted === 0 && requests.length === 0);
+
+  // A failed post must not consume the day.
+  kv = fakeKv();
+  kv.map.set("daily:g1", config());
+  postStatus = 500;
+  posted = await runDailyPrompts(makeEnv(kv), dueAt);
+  check("a failed post reports nothing posted", posted === 0);
+  check("a failed post does not consume the day",
+    JSON.parse(kv.map.get("daily:g1")).lastPostedDate === undefined,
+    "otherwise an outage silently skips a whole day");
+  postStatus = 200;
+
+  // Alternate rotation persists across days.
+  kv = fakeKv();
+  kv.map.set("daily:g1", config({ kind: "alternate" }));
+  await runDailyPrompts(makeEnv(kv), dueAt);
+  const firstKind = JSON.parse(kv.map.get("daily:g1")).lastKind;
+  await runDailyPrompts(makeEnv(kv), new Date("2026-07-02T15:00:00Z"));
+  const secondKind = JSON.parse(kv.map.get("daily:g1")).lastKind;
+  check("alternate rotation is persisted", firstKind === "writing" && secondKind === "photoshop", `${firstKind} then ${secondKind}`);
+
+  // One broken server must not stop the others.
+  kv = fakeKv();
+  kv.map.set("daily:g1", config());
+  kv.map.set("daily:g2", JSON.stringify({ guildId: "g2", channelId: "other-chan", kind: "writing", hour: 10 }));
+  posted = await runDailyPrompts(makeEnv(kv), dueAt);
+  check("every due server is served", posted === 2, `posted ${posted}`);
+
+  discord.close();
 }
 
 console.log("\nTitle normalisation");

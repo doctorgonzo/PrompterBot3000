@@ -1,4 +1,5 @@
 import { commands } from "./commands/index.ts";
+import { runDailyPrompts } from "./lib/daily.ts";
 import { InteractionType, pong, reply, type Env, type Interaction } from "./lib/discord.ts";
 import { verifyDiscordRequest } from "./lib/verify.ts";
 
@@ -61,8 +62,15 @@ export default {
     return new Response("Unhandled interaction type", { status: 400 });
   },
 
-  // Phase 3 will post the scheduled daily prompt here.
-  async scheduled(event: ScheduledController, _env: Env, _ctx: ExecutionContext): Promise<void> {
-    console.log("Cron fired", event.cron, new Date(event.scheduledTime).toISOString());
+  /**
+   * Runs hourly. Each server posts once a day at its own configured hour, so
+   * the work here is mostly deciding who is due.
+   */
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      runDailyPrompts(env, new Date(event.scheduledTime)).then((posted) => {
+        console.log("daily run complete", { cron: event.cron, posted });
+      }),
+    );
   },
 };

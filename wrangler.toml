@@ -5,10 +5,11 @@ compatibility_date = "2025-06-01"
 [observability]
 enabled = true
 
-# Phase 3 will enable the daily prompt. Uncomment, then `npm run deploy`.
-# Cron is UTC: 15:00 UTC = 10am Madison in summer (CDT), 9am in winter (CST).
-# [triggers]
-# crons = ["0 15 * * *"]
+# Hourly, so each server can pick its own posting hour in Madison local time.
+# Scheduling against a time zone rather than a fixed UTC hour means DST does
+# not shift the daily post twice a year.
+[triggers]
+crons = ["0 * * * *"]
 
 # Repeat suppression, per-guild source config, and the last-prompt pointer
 # used by /reroll. `wrangler dev` simulates this locally and never touches

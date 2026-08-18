@@ -31,6 +31,20 @@ export interface LastPrompt {
 
 const EMPTY_CONFIG: GuildConfig = { disabledSources: [] };
 
+/** What a server has scheduled. Absent means no daily post. */
+export interface DailyConfig {
+  guildId: string;
+  channelId: string;
+  /** "alternate" swaps between the two kinds each day. */
+  kind: PromptKind | "alternate";
+  /** Hour of the day in DAILY_TIME_ZONE, 0-23. */
+  hour: number;
+  /** Last kind actually posted, so "alternate" knows which comes next. */
+  lastKind?: PromptKind;
+  /** Local date (YYYY-MM-DD) of the last post, to prevent double-posting. */
+  lastPostedDate?: string;
+}
+
 /** Cheap, stable hash so prompt text becomes a tidy key. */
 export function shortHash(value: string): string {
   let hash = 2166136261;
@@ -135,5 +149,64 @@ export async function clearLastPrompt(env: Env, channelId: string): Promise<void
     await env.PROMPT_STATE.delete(`last:${channelId}`);
   } catch (error) {
     console.error("clearLastPrompt failed", error);
+  }
+}
+
+export async function getDailyConfig(env: Env, guildId: string): Promise<DailyConfig | null> {
+  if (!env.PROMPT_STATE) return null;
+  try {
+    return await env.PROMPT_STATE.get<DailyConfig>(`daily:${guildId}`, "json");
+  } catch (error) {
+    console.error("getDailyConfig failed", error);
+    return null;
+  }
+}
+
+export async function setDailyConfig(env: Env, config: DailyConfig): Promise<boolean> {
+  if (!env.PROMPT_STATE) return false;
+  try {
+    await env.PROMPT_STATE.put(`daily:${config.guildId}`, JSON.stringify(config));
+    return true;
+  } catch (error) {
+    console.error("setDailyConfig failed", error);
+    return false;
+  }
+}
+
+export async function clearDailyConfig(env: Env, guildId: string): Promise<boolean> {
+  if (!env.PROMPT_STATE) return false;
+  try {
+    await env.PROMPT_STATE.delete(`daily:${guildId}`);
+    return true;
+  } catch (error) {
+    console.error("clearDailyConfig failed", error);
+    return false;
+  }
+}
+
+/**
+ * Every server with a daily post configured. Fine to load wholesale — this is
+ * one small record per server, read once an hour.
+ */
+export async function listDailyConfigs(env: Env): Promise<DailyConfig[]> {
+  if (!env.PROMPT_STATE) return [];
+
+  try {
+    const configs: DailyConfig[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const page = await env.PROMPT_STATE.list({ prefix: "daily:", cursor });
+      for (const key of page.keys) {
+        const config = await env.PROMPT_STATE.get<DailyConfig>(key.name, "json");
+        if (config?.channelId) configs.push(config);
+      }
+      cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+
+    return configs;
+  } catch (error) {
+    console.error("listDailyConfigs failed", error);
+    return [];
   }
 }

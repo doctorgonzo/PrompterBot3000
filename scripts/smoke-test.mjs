@@ -212,6 +212,8 @@ const slashCommand = (name, options = [], overrides = {}) => ({
 });
 
 const stringOption = (name, value) => ({ name, type: STRING_OPTION, value });
+const intOption = (name, value) => ({ name, type: 4, value });
+const channelOption = (name, value) => ({ name, type: 7, value });
 const boolOption = (name, value) => ({ name, type: BOOLEAN_OPTION, value });
 
 async function waitForServer(timeoutMs = 60_000) {
@@ -436,6 +438,38 @@ async function runTests() {
   edit = await waitForRequest(isEdit);
   check("reroll posts a replacement", Boolean(JSON.parse(edit?.body ?? "{}").embeds?.[0]?.image?.url), edit?.body?.slice(0, 100));
   check("the replacement gets its own thread", Boolean(await waitForRequest(isThreadCall)));
+
+  console.log("\nDaily schedule");
+  await settle();
+  resetMock();
+
+  result = await post(slashCommand("daily", [], { guild_id: "daily-guild" }));
+  check("an unscheduled server says so", /no daily prompt/i.test(result.json?.data?.content ?? "") && result.json?.data?.flags === 64, result.text);
+
+  result = await post(slashCommand("daily", [
+    stringOption("kind", "alternate"),
+    channelOption("channel", "chan-daily"),
+    intOption("hour", 9),
+  ], { guild_id: "daily-guild" }));
+  const scheduled = result.json?.data?.content ?? "";
+  check("a schedule can be set", /on/i.test(scheduled) && scheduled.includes("<#chan-daily>"), result.text);
+  check("the hour is echoed in plain language", /9am/.test(scheduled), scheduled);
+  check("it says when it starts", /starting (today|tomorrow)/i.test(scheduled), scheduled);
+
+  result = await post(slashCommand("daily", [], { guild_id: "daily-guild" }));
+  check("the schedule is persisted", /alternating/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("daily", [stringOption("kind", "writing")], { guild_id: "daily-guild" }));
+  check("the channel is remembered when only the kind changes", (result.json?.data?.content ?? "").includes("<#chan-daily>"), result.text);
+
+  result = await post(slashCommand("daily", [stringOption("kind", "off")], { guild_id: "daily-guild" }));
+  check("a schedule can be turned off", /off/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("daily", [], { guild_id: "daily-guild" }));
+  check("turning it off clears the schedule", /no daily prompt/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("daily", [stringOption("kind", "writing")], { guild_id: "fresh-guild" }));
+  check("setting a kind without a channel is rejected", /channel/i.test(result.json?.data?.content ?? ""), result.text);
 
   console.log("\nHTTP surface");
   let response = await fetch(`${BASE}/`);
