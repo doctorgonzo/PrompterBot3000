@@ -11,7 +11,7 @@ import { threadNameFor } from "../src/lib/threads.ts";
 import { weightedOrder } from "../src/lib/random.ts";
 import { IMAGE_SOURCES, fetchImagePrompt, selectSources, drawFrom } from "../src/lib/images/index.ts";
 import { shortHash } from "../src/lib/store.ts";
-import { localTime, shouldPostNow, nextKind, DEFAULT_DAILY_HOUR, runDailyPrompts } from "../src/lib/daily.ts";
+import { localTime, shouldPostNow, nextKind, DEFAULT_DAILY_HOUR, runDailyPrompts, resolveDays, describeDays, EVERY_DAY } from "../src/lib/daily.ts";
 import { createServer } from "node:http";
 import { displayTitle } from "../src/lib/images/types.ts";
 import challenges from "../data/photoshop-challenges.json" with { type: "json" };
@@ -301,19 +301,50 @@ console.log("\nDaily scheduling: when to post");
 {
   const config = (over = {}) => ({ guildId: "g", channelId: "c", kind: "writing", hour: 10, ...over });
 
-  check("not yet due", shouldPostNow(config(), { date: "2026-07-01", hour: 9 }) === false);
-  check("due on the hour", shouldPostNow(config(), { date: "2026-07-01", hour: 10 }) === true);
+  check("not yet due", shouldPostNow(config(), { date: "2026-07-01", hour: 9, weekday: 3 }) === false);
+  check("due on the hour", shouldPostNow(config(), { date: "2026-07-01", hour: 10, weekday: 3 }) === true);
   // Catch-up: a missed or failed run still posts later the same day.
-  check("a missed hour catches up later", shouldPostNow(config(), { date: "2026-07-01", hour: 14 }) === true);
+  check("a missed hour catches up later", shouldPostNow(config(), { date: "2026-07-01", hour: 14, weekday: 3 }) === true);
   check("already posted today stays quiet",
-    shouldPostNow(config({ lastPostedDate: "2026-07-01" }), { date: "2026-07-01", hour: 14 }) === false);
+    shouldPostNow(config({ lastPostedDate: "2026-07-01" }), { date: "2026-07-01", hour: 14, weekday: 3 }) === false);
   check("yesterday's post does not block today",
-    shouldPostNow(config({ lastPostedDate: "2026-06-30" }), { date: "2026-07-01", hour: 10 }) === true);
+    shouldPostNow(config({ lastPostedDate: "2026-06-30" }), { date: "2026-07-01", hour: 10, weekday: 3 }) === true);
   // 2am does not exist on spring-forward day; >= is what saves an hour:2 server.
   check("a nonexistent DST hour still posts",
     shouldPostNow(config({ hour: 2 }), localTime(new Date("2026-03-08T08:00:00Z"))) === true);
 
   check("the default hour is reasonable", DEFAULT_DAILY_HOUR >= 6 && DEFAULT_DAILY_HOUR <= 20);
+}
+
+console.log("\nDaily scheduling: cadence");
+{
+  check("weekday is reported", localTime(new Date("2026-07-01T15:00:00Z")).weekday === 3, "2026-07-01 is a Wednesday");
+  check("Sunday is 0", localTime(new Date("2026-07-05T15:00:00Z")).weekday === 0);
+
+  check("every day covers the week", resolveDays("daily").length === 7);
+  check("weekdays excludes the weekend", resolveDays("weekdays").join(",") === "1,2,3,4,5");
+  check("weekends are Saturday and Sunday", resolveDays("weekends").sort().join(",") === "0,6");
+  check("a single weekday resolves alone", resolveDays("monday").join(",") === "1");
+  check("an unknown value falls back to every day", resolveDays("nonsense").length === 7);
+
+  check("cadence reads naturally",
+    describeDays(EVERY_DAY) === "every day" &&
+    describeDays([1, 2, 3, 4, 5]) === "every weekday" &&
+    describeDays([1]) === "every Monday",
+    [describeDays(EVERY_DAY), describeDays([1,2,3,4,5]), describeDays([1])].join(" | "));
+  check("an absent cadence describes as every day", describeDays(undefined) === "every day");
+
+  const weekly = { guildId: "g", channelId: "c", kind: "writing", hour: 10, days: [1] };
+  const wednesday = localTime(new Date("2026-07-01T15:00:00Z"));
+  const monday = localTime(new Date("2026-07-06T15:00:00Z"));
+
+  check("a weekly schedule skips other days", shouldPostNow(weekly, wednesday) === false);
+  check("a weekly schedule posts on its day", shouldPostNow(weekly, monday) === true);
+
+  // Schedules saved before cadence existed must keep working.
+  const legacy = { guildId: "g", channelId: "c", kind: "writing", hour: 10 };
+  check("a schedule with no cadence posts daily",
+    shouldPostNow(legacy, wednesday) === true && shouldPostNow(legacy, monday) === true);
 }
 
 console.log("\nDaily scheduling: kind rotation");
@@ -431,6 +462,15 @@ console.log("\nDaily scheduling: posting");
   await runDailyPrompts(makeEnv(kv), new Date("2026-07-02T15:00:00Z"));
   const secondKind = JSON.parse(kv.map.get("daily:g1")).lastKind;
   check("alternate rotation is persisted", firstKind === "writing" && secondKind === "photoshop", `${firstKind} then ${secondKind}`);
+
+  // A weekly server must not post on the wrong day.
+  kv = fakeKv();
+  kv.map.set("daily:g1", config({ days: [1] }));
+  requests.length = 0;
+  posted = await runDailyPrompts(makeEnv(kv), dueAt); // a Wednesday
+  check("a weekly schedule stays quiet off-day", posted === 0 && requests.length === 0);
+  posted = await runDailyPrompts(makeEnv(kv), new Date("2026-07-06T15:00:00Z")); // a Monday
+  check("a weekly schedule posts on its day", posted === 1);
 
   // One broken server must not stop the others.
   kv = fakeKv();

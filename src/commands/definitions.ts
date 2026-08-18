@@ -146,16 +146,30 @@ export const PROMPT_CONFIG_COMMAND = {
   ],
 };
 
-export const DAILY_KIND_CHOICES = [
+export const SCHEDULE_KIND_CHOICES = [
   { name: "Writing prompts", value: "writing" },
   { name: "Photoshop challenges", value: "photoshop" },
   { name: "Alternate between both", value: "alternate" },
   { name: "Off", value: "off" },
 ];
 
-export const DAILY_COMMAND = {
-  name: "daily",
-  description: "Schedule a daily prompt for this server",
+const WEEKDAY_CHOICE_NAMES = [
+  "Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays",
+];
+
+export const SCHEDULE_DAY_CHOICES = [
+  { name: "Every day", value: "daily" },
+  { name: "Weekdays (Mon-Fri)", value: "weekdays" },
+  { name: "Weekends", value: "weekends" },
+  ...WEEKDAY_CHOICE_NAMES.map((label) => ({
+    name: label,
+    value: label.slice(0, -1).toLowerCase(),
+  })),
+];
+
+export const SCHEDULE_COMMAND = {
+  name: "schedule",
+  description: "Schedule recurring prompts for this server",
   type: CHAT_INPUT,
   default_member_permissions: MANAGE_GUILD,
   options: [
@@ -164,7 +178,7 @@ export const DAILY_COMMAND = {
       description: "What to post each day, or Off to stop",
       type: STRING_OPTION,
       required: false,
-      choices: DAILY_KIND_CHOICES,
+      choices: SCHEDULE_KIND_CHOICES,
     },
     {
       name: "channel",
@@ -172,6 +186,13 @@ export const DAILY_COMMAND = {
       type: CHANNEL_OPTION,
       required: false,
       channel_types: [GUILD_TEXT_CHANNEL],
+    },
+    {
+      name: "days",
+      description: "How often to post (default: every day)",
+      type: STRING_OPTION,
+      required: false,
+      choices: SCHEDULE_DAY_CHOICES,
     },
     {
       name: "hour",
@@ -196,6 +217,6 @@ export const COMMAND_DEFINITIONS = [
   WRITING_PROMPT_COMMAND,
   PHOTOSHOP_COMMAND,
   PROMPT_CONFIG_COMMAND,
-  DAILY_COMMAND,
+  SCHEDULE_COMMAND,
   REROLL_COMMAND,
 ];

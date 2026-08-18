@@ -1,5 +1,11 @@
 import { getOption, reply, type Command } from "../lib/discord.ts";
-import { DAILY_TIME_ZONE, DEFAULT_DAILY_HOUR, localTime, nextKind } from "../lib/daily.ts";
+import {
+  DEFAULT_DAILY_HOUR,
+  describeDays,
+  localTime,
+  nextKind,
+  resolveDays,
+} from "../lib/daily.ts";
 import {
   clearDailyConfig,
   getDailyConfig,
@@ -7,7 +13,7 @@ import {
   setDailyConfig,
   type DailyConfig,
 } from "../lib/store.ts";
-import { DAILY_COMMAND } from "./definitions.ts";
+import { SCHEDULE_COMMAND } from "./definitions.ts";
 
 const KIND_LABELS: Record<string, string> = {
   writing: "writing prompts",
@@ -25,13 +31,13 @@ function hourLabel(hour: number): string {
 function describe(config: DailyConfig): string {
   const upNext = config.kind === "alternate" ? ` Up next: ${KIND_LABELS[nextKind(config)]}.` : "";
   return (
-    `Daily prompt is **on** — ${KIND_LABELS[config.kind]} in <#${config.channelId}> ` +
-    `at **${hourLabel(config.hour)}** Madison time.${upNext}`
+    `Scheduled prompts are **on** — ${KIND_LABELS[config.kind]} in <#${config.channelId}>, ` +
+    `**${describeDays(config.days)}** at **${hourLabel(config.hour)}** Madison time.${upNext}`
   );
 }
 
-export const daily: Command = {
-  name: DAILY_COMMAND.name,
+export const schedule: Command = {
+  name: SCHEDULE_COMMAND.name,
   handler: async ({ interaction, env }) => {
     const guildId = interaction.guild_id;
     if (!guildId) {
@@ -48,21 +54,22 @@ export const daily: Command = {
     const kind = getOption(interaction, "kind");
     const channel = getOption(interaction, "channel");
     const hour = getOption(interaction, "hour");
+    const days = getOption(interaction, "days");
     const existing = await getDailyConfig(env, guildId);
 
     // No options: report the current schedule.
-    if (kind === undefined && channel === undefined && hour === undefined) {
+    if (kind === undefined && channel === undefined && hour === undefined && days === undefined) {
       return reply(
         existing
           ? describe(existing)
-          : "No daily prompt scheduled. Set one with `/daily kind:` and `channel:`.",
+          : "Nothing scheduled. Set it up with `/schedule kind:` and `channel:`.",
         { ephemeral: true },
       );
     }
 
     if (kind === "off") {
       await clearDailyConfig(env, guildId);
-      return reply("Daily prompt is now **off**.", { ephemeral: true });
+      return reply("Scheduled prompts are now **off**.", { ephemeral: true });
     }
 
     const channelId = typeof channel === "string" ? channel : existing?.channelId;
@@ -73,6 +80,8 @@ export const daily: Command = {
     const resolvedKind = (typeof kind === "string" ? kind : existing?.kind ?? "alternate") as
       DailyConfig["kind"];
     const resolvedHour = typeof hour === "number" ? hour : existing?.hour ?? DEFAULT_DAILY_HOUR;
+    const resolvedDays =
+      typeof days === "string" ? resolveDays(days) : existing?.days ?? resolveDays("daily");
 
     const now = localTime(new Date());
 
@@ -81,6 +90,7 @@ export const daily: Command = {
       channelId,
       kind: resolvedKind,
       hour: resolvedHour,
+      days: resolvedDays,
       ...(existing?.lastKind ? { lastKind: existing.lastKind } : {}),
       // If today's slot has already passed, mark today as done so scheduling
       // doesn't fire a surprise post within the hour. Starts tomorrow instead.
@@ -93,7 +103,13 @@ export const daily: Command = {
       });
     }
 
-    const startsTomorrow = now.hour >= resolvedHour ? " Starting tomorrow." : " Starting today.";
-    return reply(`${describe(config)}${startsTomorrow}`, { ephemeral: true });
+    // "Next time" rather than "tomorrow" — with a weekly cadence the next slot
+    // may be days away.
+    const startsWhen =
+      now.hour >= resolvedHour || !resolvedDays.includes(now.weekday)
+        ? " Starting next time it comes round."
+        : " Starting today.";
+
+    return reply(`${describe(config)}${startsWhen}`, { ephemeral: true });
   },
 };

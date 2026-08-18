@@ -19,7 +19,7 @@ server to babysit.
 | `/writingprompt [genre] [length] [constraint] [thread]` | Anyone | Posts a writing prompt |
 | `/photoshop [source] [thread]` | Anyone | Posts an image as a Photoshop challenge |
 | `/promptconfig [source] [enabled]` | Manage Server | View or change which image sources this server uses |
-| `/daily [kind] [channel] [hour]` | Manage Server | Schedule a daily prompt |
+| `/schedule [kind] [channel] [days] [hour]` | Manage Server | Schedule recurring prompts |
 | `/reroll` | Manage Messages | Replaces the most recent prompt in the channel |
 
 The two moderator commands are gated with `default_member_permissions`, so
@@ -99,34 +99,45 @@ intent.
 If nothing can be generated to replace it, the original is left alone rather
 than deleted into an empty gap.
 
-### `/daily`
+### `/schedule`
 
-Schedules a prompt to post itself every day, with no one running a command.
+Posts prompts on a recurring schedule, with no one running a command.
 
 ```
-/daily kind:Alternate between both channel:#prompts hour:10
+/schedule kind:Alternate between both channel:#prompts days:Mondays hour:10
 ```
 
 - **kind** — writing prompts, Photoshop challenges, alternating, or off
 - **channel** — where it posts
+- **days** — every day, weekdays, weekends, or a single weekday. Default every day
 - **hour** — 0–23 in Madison local time, default 10
 
-Run it with no options to see the current schedule. The daily post is threaded
-like any other, and `/reroll` works on it.
+Options are independent, so you can change one without restating the others:
+`/schedule days:Mondays` switches an existing daily schedule to weekly and
+leaves the channel, kind and hour alone.
+
+Run it with no options to see the current schedule. Scheduled posts are threaded
+like any other, and `/reroll` works on them.
 
 **Why hourly rather than one fixed cron.** The Worker's cron fires every hour and
-each server posts once, at its own local hour. Scheduling against
-`America/Chicago` rather than a fixed UTC time means the post doesn't shift by an
-hour when daylight saving changes — a single `0 15 * * *` cron would be 10am in
-summer and 9am in winter. It also lets different servers pick different times.
+each server posts at most once a day, on its own days and at its own local hour.
+Cadence lives in per-server config rather than in the cron expression, so
+changing daily to weekly needs no redeploy.
+
+Scheduling against `America/Chicago` rather than a fixed UTC time means the post
+doesn't shift by an hour when daylight saving changes — a single `0 15 * * *`
+cron would be 10am in summer and 9am in winter.
 
 A missed hour catches up later the same day, so a brief outage delays the post
 rather than skipping it. A failed post doesn't consume the day either — it
 retries on the next hourly run. `lastPostedDate` is what keeps any of that from
 posting twice.
 
-Setting a schedule for an hour that has already passed today starts tomorrow,
+Setting a schedule for a slot that has already passed starts at the next one
 rather than firing a surprise post within the hour.
+
+Schedules saved before cadence existed keep posting daily — an absent `days`
+means every day.
 
 ### Repeat suppression
 
@@ -326,7 +337,7 @@ touch them.
 npm test
 ```
 
-Two suites, 160 checks. `scripts/test-units.mjs` covers prompt selection and
+Two suites, 176 checks. `scripts/test-units.mjs` covers prompt selection and
 thread naming against the real data files — every genre/length combination,
 filter correctness, generated-text grammar, genre pool isolation, and
 determinism under a seeded RNG — so a bad edit to `data/*.json` fails here
@@ -387,7 +398,7 @@ src/
     writingprompt.ts     /writingprompt
     photoshop.ts         /photoshop
     promptconfig.ts      /promptconfig
-    daily.ts             /daily
+    schedule.ts          /schedule
     reroll.ts            /reroll
 scripts/
   register-commands.mjs  Pushes definitions to Discord
@@ -447,7 +458,7 @@ call the network should return `defer()` immediately, do the slow work inside
       and Unsplash, with attribution and source fallback
 - [x] **Phase 2.5** — Auto-threading (pulled forward from Phase 3)
 - [x] **Phase 4** — Mod config, source blocklist, `/reroll`, repeat suppression
-- [x] **Phase 3** — Scheduled daily prompt via cron, per-server and DST-aware
+- [x] **Phase 3** — Scheduled prompts via cron, per-server cadence, DST-aware
 - [ ] **Phase 5** — Submission gallery, hall of fame, weekly recap
 
 ### Image sourcing policy

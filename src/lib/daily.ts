@@ -23,6 +23,43 @@ export interface LocalTime {
   date: string;
   /** 0-23 in DAILY_TIME_ZONE. */
   hour: number;
+  /** 0 = Sunday, 6 = Saturday, in DAILY_TIME_ZONE. */
+  weekday: number;
+}
+
+export const WEEKDAY_NAMES = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+] as const;
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+
+export const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const WEEKENDS = [0, 6];
+
+/** Maps a `days` choice value onto the weekday numbers it covers. */
+export function resolveDays(choice: string): number[] {
+  if (choice === "daily") return [...EVERY_DAY];
+  if (choice === "weekdays") return [...WEEKDAYS];
+  if (choice === "weekends") return [...WEEKENDS];
+
+  const index = WEEKDAY_NAMES.findIndex((name) => name.toLowerCase() === choice.toLowerCase());
+  return index === -1 ? [...EVERY_DAY] : [index];
+}
+
+/** Human-readable cadence, derived from the stored weekday set. */
+export function describeDays(days: readonly number[] | undefined): string {
+  const set = [...(days ?? EVERY_DAY)].sort();
+  const key = set.join(",");
+
+  if (key === EVERY_DAY.join(",")) return "every day";
+  if (key === WEEKDAYS.join(",")) return "every weekday";
+  if (key === WEEKENDS.join(",")) return "every weekend";
+  if (set.length === 1) return `every ${WEEKDAY_NAMES[set[0]!]}`;
+
+  return `on ${set.map((day) => WEEKDAY_NAMES[day]).join(", ")}`;
 }
 
 export function localTime(instant: Date, timeZone: string = DAILY_TIME_ZONE): LocalTime {
@@ -32,6 +69,7 @@ export function localTime(instant: Date, timeZone: string = DAILY_TIME_ZONE): Lo
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    weekday: "short",
     // h23 rather than hour12:false, which can yield "24" at midnight.
     hourCycle: "h23",
   }).formatToParts(instant);
@@ -41,6 +79,7 @@ export function localTime(instant: Date, timeZone: string = DAILY_TIME_ZONE): Lo
   return {
     date: `${part("year")}-${part("month")}-${part("day")}`,
     hour: Number(part("hour")),
+    weekday: WEEKDAY_INDEX[part("weekday")] ?? 0,
   };
 }
 
@@ -52,6 +91,11 @@ export function localTime(instant: Date, timeZone: string = DAILY_TIME_ZONE): Lo
  * keeps that from posting more than once a day.
  */
 export function shouldPostNow(config: DailyConfig, now: LocalTime): boolean {
+  // Absent `days` means every day, so schedules saved before cadence existed
+  // keep behaving as they did.
+  const days = config.days ?? EVERY_DAY;
+  if (!days.includes(now.weekday)) return false;
+
   if (now.hour < config.hour) return false;
   return config.lastPostedDate !== now.date;
 }

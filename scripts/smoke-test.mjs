@@ -443,10 +443,10 @@ async function runTests() {
   await settle();
   resetMock();
 
-  result = await post(slashCommand("daily", [], { guild_id: "daily-guild" }));
-  check("an unscheduled server says so", /no daily prompt/i.test(result.json?.data?.content ?? "") && result.json?.data?.flags === 64, result.text);
+  result = await post(slashCommand("schedule", [], { guild_id: "daily-guild" }));
+  check("an unscheduled server says so", /nothing scheduled/i.test(result.json?.data?.content ?? "") && result.json?.data?.flags === 64, result.text);
 
-  result = await post(slashCommand("daily", [
+  result = await post(slashCommand("schedule", [
     stringOption("kind", "alternate"),
     channelOption("channel", "chan-daily"),
     intOption("hour", 9),
@@ -454,21 +454,27 @@ async function runTests() {
   const scheduled = result.json?.data?.content ?? "";
   check("a schedule can be set", /on/i.test(scheduled) && scheduled.includes("<#chan-daily>"), result.text);
   check("the hour is echoed in plain language", /9am/.test(scheduled), scheduled);
-  check("it says when it starts", /starting (today|tomorrow)/i.test(scheduled), scheduled);
+  check("it says when it starts", /starting/i.test(scheduled), scheduled);
 
-  result = await post(slashCommand("daily", [], { guild_id: "daily-guild" }));
+  result = await post(slashCommand("schedule", [], { guild_id: "daily-guild" }));
   check("the schedule is persisted", /alternating/i.test(result.json?.data?.content ?? ""), result.text);
 
-  result = await post(slashCommand("daily", [stringOption("kind", "writing")], { guild_id: "daily-guild" }));
+  result = await post(slashCommand("schedule", [stringOption("kind", "writing")], { guild_id: "daily-guild" }));
   check("the channel is remembered when only the kind changes", (result.json?.data?.content ?? "").includes("<#chan-daily>"), result.text);
 
-  result = await post(slashCommand("daily", [stringOption("kind", "off")], { guild_id: "daily-guild" }));
+  result = await post(slashCommand("schedule", [stringOption("days", "monday")], { guild_id: "daily-guild" }));
+  check("cadence can be changed to weekly", /every Monday/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("schedule", [stringOption("days", "weekdays")], { guild_id: "daily-guild" }));
+  check("cadence can be set to weekdays", /every weekday/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("schedule", [stringOption("kind", "off")], { guild_id: "daily-guild" }));
   check("a schedule can be turned off", /off/i.test(result.json?.data?.content ?? ""), result.text);
 
-  result = await post(slashCommand("daily", [], { guild_id: "daily-guild" }));
-  check("turning it off clears the schedule", /no daily prompt/i.test(result.json?.data?.content ?? ""), result.text);
+  result = await post(slashCommand("schedule", [], { guild_id: "daily-guild" }));
+  check("turning it off clears the schedule", /nothing scheduled/i.test(result.json?.data?.content ?? ""), result.text);
 
-  result = await post(slashCommand("daily", [stringOption("kind", "writing")], { guild_id: "fresh-guild" }));
+  result = await post(slashCommand("schedule", [stringOption("kind", "writing")], { guild_id: "fresh-guild" }));
   check("setting a kind without a channel is rejected", /channel/i.test(result.json?.data?.content ?? ""), result.text);
 
   console.log("\nHTTP surface");

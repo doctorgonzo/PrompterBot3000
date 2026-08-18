@@ -39,6 +39,8 @@ export interface DailyConfig {
   kind: PromptKind | "alternate";
   /** Hour of the day in DAILY_TIME_ZONE, 0-23. */
   hour: number;
+  /** Weekdays to post on, 0 = Sunday. Absent means every day. */
+  days?: number[];
   /** Last kind actually posted, so "alternate" knows which comes next. */
   lastKind?: PromptKind;
   /** Local date (YYYY-MM-DD) of the last post, to prevent double-posting. */
