@@ -298,6 +298,7 @@ avoids Discord's verification requirements as the server grows.
 | `npm run dev` | Local Worker at `localhost:8787` |
 | `npm run deploy` | Ship to Cloudflare |
 | `npm run register` | Push slash command changes to Discord |
+| `npm run unregister-guild` | Clear guild-scoped commands (when going global) |
 | `npm run typecheck` | Type check without emitting |
 | `npm run tail` | Live production logs |
 
@@ -361,6 +362,34 @@ text or handler code never needs registering.
 Worker secrets (`DISCORD_PUBLIC_KEY` and friends) are configured in Cloudflare
 via `wrangler secret put` and are unrelated to these — deploying does not
 touch them.
+
+---
+
+## Running in more than one server
+
+Commands register to one guild by default, which is right while developing —
+they appear instantly instead of taking up to an hour. For a second server,
+switch to global registration:
+
+```bash
+npm run unregister-guild
+```
+
+Then remove `DISCORD_GUILD_ID` from `.dev.vars` and from the GitHub secrets
+(`gh secret delete DISCORD_GUILD_ID`), and register again:
+
+```bash
+npm run register
+```
+
+Order matters. Global commands do not replace guild-scoped ones — they stack, so
+clearing the guild copies first avoids every command appearing twice in the
+original server. Global commands can take up to an hour to propagate.
+
+Per-server state needs no work: source settings, schedules, the seen-set and the
+reroll pointer are all keyed by guild id, so each server gets its own. Command
+permission overrides set in Discord's UI are per-server too, so a new server
+starts with the defaults.
 
 ---
 

@@ -12,7 +12,8 @@
     "tail": "wrangler tail",
     "test": "node scripts/test-units.mjs && node scripts/smoke-test.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "sources": "node scripts/sources.mjs"
+    "sources": "node scripts/sources.mjs",
+    "unregister-guild": "node scripts/unregister-guild.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260818.1",
