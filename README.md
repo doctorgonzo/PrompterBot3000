@@ -11,13 +11,19 @@ server to babysit.
 
 ## Status
 
-**Phase 2 complete.** Live commands:
+**Phase 4 complete.** Live commands:
 
-| Command | What it does |
-|---|---|
-| `/ping` | Confirms the bot is awake (visible only to you) |
-| `/writingprompt [genre] [length] [constraint] [thread]` | Posts a writing prompt |
-| `/photoshop [source] [thread]` | Posts an image as a Photoshop challenge |
+| Command | Who | What it does |
+|---|---|---|
+| `/ping` | Anyone | Confirms the bot is awake (visible only to you) |
+| `/writingprompt [genre] [length] [constraint] [thread]` | Anyone | Posts a writing prompt |
+| `/photoshop [source] [thread]` | Anyone | Posts an image as a Photoshop challenge |
+| `/promptconfig [source] [enabled]` | Manage Server | View or change which image sources this server uses |
+| `/reroll` | Manage Messages | Replaces the most recent prompt in the channel |
+
+The two moderator commands are gated with `default_member_permissions`, so
+Discord hides them from regular members. Server admins can override that
+per-command under **Server Settings → Integrations**.
 
 `/writingprompt` draws from an 80-prompt curated pack blended with a
 combinatorial mixer worth 15,600 base combinations, so the pool doesn't run dry.
@@ -74,10 +80,40 @@ tags its API terms require, and its usage endpoint is pinged after posting.
 Because this hits the network it uses a deferred response: Discord shows
 "thinking…" for a moment, then the image replaces it. That is expected.
 
+### `/promptconfig`
+
+Run it with no options to see which sources are on. Pass `source` plus
+`enabled` to toggle one for the whole server — no redeploy needed.
+
+Disabling every source doesn't silence the command: `/photoshop` ignores the
+blocklist rather than post nothing.
+
+### `/reroll`
+
+Deletes the most recent prompt in the channel and posts a fresh one of the same
+kind, with the same filters. For when an image lands badly or a prompt doesn't
+suit the room. Deleting the message takes its thread with it, which is the
+intent.
+
+If nothing can be generated to replace it, the original is left alone rather
+than deleted into an empty gap.
+
+### Repeat suppression
+
+Every prompt posted is recorded per-server for 45 days, and draws that come back
+as recent repeats are redrawn past — up to three times for images, five for
+writing prompts. If everything drawn is still a repeat, it posts anyway: a
+repeat beats an empty channel.
+
+This needs the `PROMPT_STATE` KV binding. Without it the bot still works, just
+without memory — no repeat suppression, no saved source settings, and `/reroll`
+has nothing to point at.
+
 Image prompts pull only from open-license collections. Note that museum
 collections include classical nudes — appropriate for most art communities, but
-worth knowing before pointing this at a general channel. Phase 4's mod controls
-are where to tune that.
+worth knowing before pointing this at a general channel. If it doesn't suit your
+server, `/promptconfig` turns the museum sources off, and `/reroll` retracts any
+single post that lands badly.
 
 ---
 
@@ -96,7 +132,17 @@ Fill in the values from the
 Set `DISCORD_GUILD_ID` to your Madison server while developing. Commands then
 register instantly instead of taking up to an hour to propagate.
 
-### 2. Deploy the Worker
+### 2. Create the KV namespace
+
+```bash
+npx wrangler kv namespace create PROMPT_STATE
+```
+
+Put the printed id into `wrangler.toml` under `[[kv_namespaces]]`, replacing the
+one committed there — that one belongs to the original deployment and won't be
+writable by your account.
+
+### 3. Deploy the Worker
 
 ```bash
 npx wrangler login
@@ -108,7 +154,7 @@ npm run deploy
 
 Note the URL it prints, e.g. `https://autoprompterbot.<your-subdomain>.workers.dev`.
 
-### 3. Upload production secrets
+### 4. Upload production secrets
 
 `.dev.vars` is local-only. The deployed Worker needs its own copy — run each of
 these and paste the value when prompted:
@@ -125,7 +171,7 @@ npx wrangler secret put DISCORD_APPLICATION_ID
 npx wrangler secret put DISCORD_BOT_TOKEN
 ```
 
-### 4. Point Discord at the Worker
+### 5. Point Discord at the Worker
 
 In the Developer Portal → your app → **General Information** → **Interactions
 Endpoint URL**, enter:
@@ -138,7 +184,7 @@ Discord immediately sends a signed PING and refuses to save the URL if the
 response is wrong — so a successful save *is* your verification that signing
 works in production.
 
-### 5. Invite the bot to your server
+### 6. Invite the bot to your server
 
 Do this **before** registering commands. Guild-scoped registration requires the
 bot to already be in the guild — otherwise Discord returns `403 Missing Access`,
@@ -154,7 +200,7 @@ That permission integer grants: view channels, send messages, embed links,
 attach files, add reactions, read message history, create public threads, and
 send messages in threads.
 
-### 6. Register the slash commands
+### 7. Register the slash commands
 
 ```bash
 npm run register
@@ -250,7 +296,7 @@ touch them.
 npm test
 ```
 
-Two suites, 91 checks. `scripts/test-units.mjs` covers prompt selection and
+Two suites, 120 checks. `scripts/test-units.mjs` covers prompt selection and
 thread naming against the real data files — every genre/length combination,
 filter correctness, generated-text grammar, genre pool isolation, and
 determinism under a seeded RNG — so a bad edit to `data/*.json` fails here
@@ -286,6 +332,9 @@ src/
     verify.ts            Ed25519 signature verification (WebCrypto)
     discord.ts           API types and response helpers
     prompts.ts           Prompt selection: curated pack + mixer
+    prompt-builders.ts   Builds the message for each prompt kind
+    deliver.ts           Post-publish work: seen-marking, thread, reroll pointer
+    store.ts             Workers KV: seen set, guild config, last prompt
     threads.ts           Thread naming and creation
     random.ts            Seedable pick / weighted ordering helpers
     http.ts              JSON fetch with timeout, returns null on failure
@@ -301,6 +350,8 @@ src/
     ping.ts              Health check command
     writingprompt.ts     /writingprompt
     photoshop.ts         /photoshop
+    promptconfig.ts      /promptconfig
+    reroll.ts            /reroll
 scripts/
   register-commands.mjs  Pushes definitions to Discord
   doctor.mjs             Diagnoses credential and setup problems
@@ -358,15 +409,9 @@ call the network should return `defer()` immediately, do the slow work inside
 - [x] **Phase 2** — `/photoshop` pulling from the Met, Art Institute of Chicago,
       and Unsplash, with attribution and source fallback
 - [x] **Phase 2.5** — Auto-threading (pulled forward from Phase 3)
+- [x] **Phase 4** — Mod config, source blocklist, `/reroll`, repeat suppression
 - [ ] **Phase 3** — Scheduled daily prompt via cron
-- [ ] **Phase 4** — Mod config, source blocklist, `/reroll`
 - [ ] **Phase 5** — Submission gallery, hall of fame, weekly recap
-
-### Known gaps
-
-Repeat suppression needs storage and is not in yet — the same artwork can
-resurface. Phase 4 adds Workers KV for a "recently seen" set, along with mod
-controls and a source blocklist.
 
 ### Image sourcing policy
 

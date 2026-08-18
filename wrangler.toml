@@ -10,9 +10,9 @@ enabled = true
 # [triggers]
 # crons = ["0 15 * * *"]
 
-# Phase 4 storage (seen-image dedupe, per-guild config). Create it with:
-#   npx wrangler kv namespace create PROMPT_STATE
-# then paste the printed id below and uncomment.
-# [[kv_namespaces]]
-# binding = "PROMPT_STATE"
-# id = "<paste-id-here>"
+# Repeat suppression, per-guild source config, and the last-prompt pointer
+# used by /reroll. `wrangler dev` simulates this locally and never touches
+# the real namespace.
+[[kv_namespaces]]
+binding = "PROMPT_STATE"
+id = "b2e24fda30d54bcfafe0f3e437445c0e"

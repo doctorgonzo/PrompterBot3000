@@ -8,6 +8,8 @@ export interface ImageResult {
   attribution: string;
   sourceId: string;
   sourceLabel: string;
+  /** Stable per-artwork identity, used for repeat suppression. */
+  dedupeKey: string;
   /**
    * Some APIs (Unsplash) require a ping when a photo is actually used. Fired
    * after the message is posted, never blocking it.

@@ -1,4 +1,3 @@
-import challengeData from "../../data/photoshop-challenges.json" with { type: "json" };
 import {
   actorName,
   defer,
@@ -8,75 +7,56 @@ import {
   type Env,
   type Interaction,
 } from "../lib/discord.ts";
-import { fetchImagePrompt, reportUnsplashUse } from "../lib/images/index.ts";
-import { pick } from "../lib/random.ts";
-import { openThreadForInteraction, threadNameFor } from "../lib/threads.ts";
+import { finalizePrompt } from "../lib/deliver.ts";
+import { buildPhotoshopPrompt, isFailure } from "../lib/prompt-builders.ts";
+import { getGuildConfig, hasSeen } from "../lib/store.ts";
 import { PHOTOSHOP_COMMAND } from "./definitions.ts";
-
-const PHOTOSHOP_COLOR = 0x5b8fa8;
-
-const challenges = (challengeData as { challenges: string[] }).challenges;
 
 async function deliver(
   env: Env,
   interaction: Interaction,
   options: { sourceId?: string; wantsThread: boolean },
 ): Promise<void> {
-  const image = await fetchImagePrompt(env, Math.random, options.sourceId);
+  const guildId = interaction.guild_id;
+  const config = guildId ? await getGuildConfig(env, guildId) : { disabledSources: [] };
 
-  if (!image) {
-    await editOriginalResponse(env, interaction.token, {
-      content: options.sourceId
-        ? "That collection isn't responding right now — try again, or leave `source` off to use any of them."
-        : "Couldn't reach any image source just now. Try again in a moment.",
-    });
+  const built = await buildPhotoshopPrompt(
+    env,
+    { sourceId: options.sourceId, disabledSourceIds: config.disabledSources },
+    {
+      requester: actorName(interaction),
+      isRepeat: guildId ? (key) => hasSeen(env, guildId, key) : undefined,
+    },
+  );
+
+  if (isFailure(built)) {
+    await editOriginalResponse(env, interaction.token, { content: built.error });
     return;
   }
 
-  const challenge = pick(challenges, Math.random);
-  const requester = actorName(interaction);
-
-  const message = await editOriginalResponse(env, interaction.token, {
-    embeds: [
-      {
-        title: "🖼️ Photoshop Challenge",
-        // Attribution sits in the description because footers can't hold links,
-        // and some sources require the credit to be linked.
-        description: `**${challenge}**\n\n${image.attribution}`,
-        color: PHOTOSHOP_COLOR,
-        image: { url: image.imageUrl },
-        ...(requester ? { footer: { text: `for ${requester}` } } : {}),
-      },
-    ],
+  const message = await editOriginalResponse(env, interaction.token, built.payload);
+  await finalizePrompt(env, interaction, built, {
+    message: message ?? undefined,
+    wantsThread: options.wantsThread,
   });
-
-  if (image.usageTrackingUrl) {
-    await reportUnsplashUse(env, image.usageTrackingUrl);
-  }
-
-  if (options.wantsThread && interaction.guild_id && message) {
-    await openThreadForInteraction(
-      env,
-      interaction.token,
-      threadNameFor(image.title, "🖼️ "),
-      message,
-    );
-  }
 }
 
 /**
- * Unlike /writingprompt this hits the network, so it defers first and fills in
- * the message afterwards. That also hands back the posted message directly,
- * so the thread needs no lookup.
+ * Defers first because this hits the network. The edit also hands back the
+ * posted message, so the thread needs no lookup.
  */
 export const photoshop: Command = {
   name: PHOTOSHOP_COMMAND.name,
   handler: ({ interaction, env, ctx }) => {
     const rawSource = getOption(interaction, "source");
-    const sourceId = typeof rawSource === "string" ? rawSource : undefined;
-    const wantsThread = getOption(interaction, "thread") !== false;
 
-    ctx.waitUntil(deliver(env, interaction, { sourceId, wantsThread }));
+    ctx.waitUntil(
+      deliver(env, interaction, {
+        sourceId: typeof rawSource === "string" ? rawSource : undefined,
+        wantsThread: getOption(interaction, "thread") !== false,
+      }),
+    );
+
     return defer();
   },
 };

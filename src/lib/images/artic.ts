@@ -70,6 +70,7 @@ export const artic: ImageSource = {
       attribution: `[${title}](${pageUrl}) — ${creator}${date} · Art Institute of Chicago · Public domain (CC0)`,
       sourceId: artic.id,
       sourceLabel: artic.label,
+      dedupeKey: `artic:${artwork.id}`,
     };
   },
 };

@@ -199,7 +199,7 @@ const PING = { id: "1", type: 1, token: "token", application_id: "000" };
 const STRING_OPTION = 3;
 const BOOLEAN_OPTION = 5;
 
-const slashCommand = (name, options = []) => ({
+const slashCommand = (name, options = [], overrides = {}) => ({
   id: "1",
   type: 2,
   token: "token",
@@ -208,6 +208,7 @@ const slashCommand = (name, options = []) => ({
   channel_id: "channel",
   data: { id: "d", name, ...(options.length > 0 ? { options } : {}) },
   member: { user: { id: "u1", username: "tester" } },
+  ...overrides,
 });
 
 const stringOption = (name, value) => ({ name, type: STRING_OPTION, value });
@@ -384,6 +385,57 @@ async function runTests() {
   await waitForRequest(isEdit);
   await settle();
   check("photoshop thread:false opens no thread", !mock.requests.some(isThreadCall));
+
+  console.log("\nModerator controls");
+  const isDelete = (r) => r.method === "DELETE" && r.url.startsWith("/channels/");
+
+  await settle();
+  resetMock();
+  result = await post(slashCommand("promptconfig"));
+  check("/promptconfig reports current settings privately",
+    result.status === 200 && result.json?.data?.flags === 64 && /Image sources/.test(result.json?.data?.content ?? ""),
+    result.text);
+  check("every source is listed", ["The Met", "Art Institute", "Unsplash"].every((label) => (result.json?.data?.content ?? "").includes(label)));
+
+  result = await post(slashCommand("promptconfig", [stringOption("source", "met"), boolOption("enabled", false)]));
+  check("a source can be disabled", /disabled/i.test(result.json?.data?.content ?? ""), result.text);
+
+  await settle();
+  resetMock();
+  await post(slashCommand("photoshop"));
+  await waitForRequest(isEdit);
+  check("a disabled source is not queried", !mock.requests.some((r) => r.url.startsWith("/met")),
+    mock.requests.filter((r) => r.url.startsWith("/met")).map((r) => r.url).join(" "));
+
+  result = await post(slashCommand("promptconfig", [stringOption("source", "met"), boolOption("enabled", true)]));
+  check("a source can be re-enabled", /enabled/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("promptconfig", [stringOption("source", "met")]));
+  check("changing a source without enabled is rejected", /enabled/i.test(result.json?.data?.content ?? "") && result.json?.data?.flags === 64);
+
+  console.log("\nReroll");
+  await settle();
+  resetMock();
+  await post(slashCommand("reroll", [], { channel_id: "never-used-channel" }));
+  edit = await waitForRequest(isEdit);
+  check("reroll with no prior prompt says so", /nothing to reroll/i.test(JSON.parse(edit?.body ?? "{}").content ?? ""), edit?.body);
+  check("reroll with nothing to replace deletes nothing", !mock.requests.some(isDelete));
+
+  await settle();
+  resetMock();
+  await post(slashCommand("photoshop", [], { channel_id: "reroll-channel" }));
+  await waitForRequest(isEdit);
+  await settle();
+
+  resetMock();
+  await post(slashCommand("reroll", [], { channel_id: "reroll-channel" }));
+  const deleted = await waitForRequest(isDelete);
+  check("reroll retracts the previous prompt", Boolean(deleted), mock.requests.map((r) => `${r.method} ${r.url}`).join(" | "));
+  check("it deletes the right message", deleted?.url === "/channels/chan-1/messages/msg-1", deleted?.url);
+
+  edit = await waitForRequest(isEdit);
+  check("reroll posts a replacement", Boolean(JSON.parse(edit?.body ?? "{}").embeds?.[0]?.image?.url), edit?.body?.slice(0, 100));
+  check("the replacement gets its own thread", Boolean(await waitForRequest(isThreadCall)));
 
   console.log("\nHTTP surface");
   let response = await fetch(`${BASE}/`);

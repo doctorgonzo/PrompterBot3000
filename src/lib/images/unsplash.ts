@@ -9,6 +9,7 @@ const DEFAULT_BASE = "https://api.unsplash.com";
 const UTM = "?utm_source=AutoPrompter&utm_medium=referral";
 
 interface UnsplashPhoto {
+  id: string;
   urls: { regular: string; full: string };
   links: { html: string; download_location?: string };
   user: { name: string; links: { html: string } };
@@ -46,6 +47,7 @@ export const unsplash: ImageSource = {
         `[Unsplash](https://unsplash.com/${UTM})`,
       sourceId: unsplash.id,
       sourceLabel: unsplash.label,
+      dedupeKey: `unsplash:${photo.id}`,
       usageTrackingUrl: photo.links.download_location,
     };
   },

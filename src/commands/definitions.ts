@@ -116,4 +116,44 @@ export const PHOTOSHOP_COMMAND = {
   ],
 };
 
-export const COMMAND_DEFINITIONS = [PING_COMMAND, WRITING_PROMPT_COMMAND, PHOTOSHOP_COMMAND];
+/** Discord permission bitfields, as strings — the API expects them that way. */
+const MANAGE_GUILD = "32";
+const MANAGE_MESSAGES = "8192";
+
+export const PROMPT_CONFIG_COMMAND = {
+  name: "promptconfig",
+  description: "View or change which image sources this server uses",
+  type: CHAT_INPUT,
+  // Hidden from regular members; admins can override under Integrations.
+  default_member_permissions: MANAGE_GUILD,
+  options: [
+    {
+      name: "source",
+      description: "Which source to change (omit to just view the current settings)",
+      type: STRING_OPTION,
+      required: false,
+      choices: IMAGE_SOURCE_CHOICES,
+    },
+    {
+      name: "enabled",
+      description: "Turn the chosen source on or off",
+      type: BOOLEAN_OPTION,
+      required: false,
+    },
+  ],
+};
+
+export const REROLL_COMMAND = {
+  name: "reroll",
+  description: "Replace the most recent prompt in this channel with a new one",
+  type: CHAT_INPUT,
+  default_member_permissions: MANAGE_MESSAGES,
+};
+
+export const COMMAND_DEFINITIONS = [
+  PING_COMMAND,
+  WRITING_PROMPT_COMMAND,
+  PHOTOSHOP_COMMAND,
+  PROMPT_CONFIG_COMMAND,
+  REROLL_COMMAND,
+];

@@ -68,6 +68,7 @@ export const met: ImageSource = {
         attribution: `[${title}](${object.objectURL}) — ${creator}${date} · The Met · Public domain`,
         sourceId: met.id,
         sourceLabel: met.label,
+        dedupeKey: `met:${id}`,
       };
     }
 

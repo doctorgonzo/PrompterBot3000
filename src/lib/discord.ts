@@ -54,6 +54,8 @@ export interface Env {
   DISCORD_BOT_TOKEN: string;
   /** Optional: enables the Unsplash image source when present. */
   UNSPLASH_ACCESS_KEY?: string;
+  /** Optional: everything degrades gracefully when this binding is absent. */
+  PROMPT_STATE?: KVNamespace;
   /** Test-only overrides so the suite can point at mock APIs. */
   DISCORD_API_BASE?: string;
   MET_API_BASE?: string;
@@ -115,6 +117,14 @@ export function reply(content: string, options: { ephemeral?: boolean } = {}): R
  * Tells Discord "working on it" so we keep the interaction alive past its 3s
  * deadline. Follow up with `editOriginalResponse` within 15 minutes.
  */
+/** Replies with an arbitrary message payload (embeds, content, or both). */
+export function replyWith(payload: Record<string, unknown>): Response {
+  return jsonResponse({
+    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: payload,
+  });
+}
+
 export function defer(options: { ephemeral?: boolean } = {}): Response {
   return jsonResponse({
     type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
@@ -240,4 +250,22 @@ export function replyWithEmbed(embed: Embed, options: { ephemeral?: boolean } = 
 /** Display name of whoever ran the command, for attribution in a footer. */
 export function actorName(interaction: Interaction): string | undefined {
   return interaction.member?.user.username ?? interaction.user?.username;
+}
+
+/** Deletes a message. Used by /reroll to retract a prompt it is replacing. */
+export async function deleteMessage(
+  env: Env,
+  channelId: string,
+  messageId: string,
+): Promise<boolean> {
+  const response = await fetch(`${apiBase(env)}/channels/${channelId}/messages/${messageId}`, {
+    method: "DELETE",
+    headers: { authorization: `Bot ${env.DISCORD_BOT_TOKEN}` },
+  });
+
+  // 404 means it is already gone, which is the outcome we wanted anyway.
+  if (response.ok || response.status === 404) return true;
+
+  console.error("deleteMessage failed", response.status, await response.text());
+  return false;
 }

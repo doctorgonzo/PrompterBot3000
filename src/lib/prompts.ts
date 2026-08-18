@@ -120,3 +120,15 @@ export const promptStats = {
     return total + characters.length * settings.length;
   }, 0),
 };
+
+export function asGenre(value: unknown): Genre | undefined {
+  return typeof value === "string" && (GENRES as readonly string[]).includes(value)
+    ? (value as Genre)
+    : undefined;
+}
+
+export function asLength(value: unknown): Length | undefined {
+  return typeof value === "string" && (LENGTHS as readonly string[]).includes(value)
+    ? (value as Length)
+    : undefined;
+}

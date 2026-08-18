@@ -9,7 +9,8 @@
 import { pickWritingPrompt, promptStats } from "../src/lib/prompts.ts";
 import { threadNameFor } from "../src/lib/threads.ts";
 import { weightedOrder } from "../src/lib/random.ts";
-import { IMAGE_SOURCES, fetchImagePrompt } from "../src/lib/images/index.ts";
+import { IMAGE_SOURCES, fetchImagePrompt, selectSources, drawFrom } from "../src/lib/images/index.ts";
+import { shortHash } from "../src/lib/store.ts";
 import { displayTitle } from "../src/lib/images/types.ts";
 import challenges from "../data/photoshop-challenges.json" with { type: "json" };
 import { GENRES, LENGTHS, GENRE_LABELS, IMAGE_SOURCE_CHOICES } from "../src/commands/definitions.ts";
@@ -203,9 +204,79 @@ console.log("\nImage sources");
   check("Unsplash switches on with a key", unsplash.isAvailable({ UNSPLASH_ACCESS_KEY: "x" }) === true);
   check("museum sources need no key", IMAGE_SOURCES.filter((s) => s.id !== "unsplash").every((s) => s.isAvailable({})));
 
-  // No network: every source is unreachable, so this must fail cleanly.
-  const noSources = await fetchImagePrompt({}, seeded(1), "definitely-not-a-source");
+  // No network involved: an unknown source narrows the list to nothing.
+  const noSources = await fetchImagePrompt({}, seeded(1), { forcedSourceId: "definitely-not-a-source" });
   check("an unknown forced source yields null", noSources === null);
+}
+
+console.log("\nSource selection");
+{
+  const env = { UNSPLASH_ACCESS_KEY: "key" };
+  const ids = (list) => list.map((s) => s.id).sort().join(",");
+
+  check("all sources when nothing is restricted", selectSources(IMAGE_SOURCES, env).length === 3);
+  check("unavailable sources are dropped", ids(selectSources(IMAGE_SOURCES, {})) === "artic,met");
+  check("a forced source wins", ids(selectSources(IMAGE_SOURCES, env, { forcedSourceId: "met" })) === "met");
+  check("disabled sources are removed", ids(selectSources(IMAGE_SOURCES, env, { disabledSourceIds: ["met"] })) === "artic,unsplash");
+  check("a forced source ignores the blocklist",
+    ids(selectSources(IMAGE_SOURCES, env, { forcedSourceId: "met", disabledSourceIds: ["met"] })) === "met",
+    "an explicit request should beat the guild default");
+  // Otherwise a moderator could accidentally silence the command entirely.
+  check("disabling everything falls back to all sources",
+    selectSources(IMAGE_SOURCES, env, { disabledSourceIds: ["met", "artic", "unsplash"] }).length === 3);
+}
+
+console.log("\nRepeat suppression");
+{
+  const stub = (id, results) => {
+    let call = 0;
+    return { id, label: id, weight: 10, isAvailable: () => true, fetch: async () => results[call++] ?? null };
+  };
+  const image = (key) => ({ imageUrl: "u", title: "t", attribution: "a", sourceId: "s", sourceLabel: "s", dedupeKey: key });
+  const seen = (...keys) => async (key) => keys.includes(key);
+
+  let got = await drawFrom([stub("a", [image("fresh")])], {}, seeded(1), { isRepeat: seen("old") });
+  check("a fresh draw is returned", got?.dedupeKey === "fresh");
+
+  got = await drawFrom([stub("a", [image("old"), image("old2"), image("fresh")])], {}, seeded(1), { isRepeat: seen("old", "old2") });
+  check("repeats are redrawn past", got?.dedupeKey === "fresh");
+
+  got = await drawFrom([stub("a", [image("old"), image("old"), image("old")])], {}, seeded(1), { isRepeat: seen("old") });
+  check("a repeat beats posting nothing", got?.dedupeKey === "old", "should fall back rather than return null");
+
+  got = await drawFrom([stub("a", [null]), stub("b", [image("fresh")])], {}, seeded(1), {});
+  check("a failing source falls through to the next", got?.dedupeKey === "fresh");
+
+  got = await drawFrom([stub("a", [null]), stub("b", [null])], {}, seeded(1), {});
+  check("all sources failing yields null", got === null);
+
+  got = await drawFrom([], {}, seeded(1), {});
+  check("an empty source list yields null", got === null);
+
+  let calls = 0;
+  const counting = { id: "c", label: "c", weight: 1, isAvailable: () => true,
+    fetch: async () => { calls++; return image("old"); } };
+  await drawFrom([counting], {}, seeded(1), { isRepeat: seen("old"), repeatAttempts: 2 });
+  check("redraws are bounded", calls === 2, `made ${calls} attempts`);
+}
+
+console.log("\nKey hashing");
+{
+  check("hashing is stable", shortHash("A cursed object.") === shortHash("A cursed object."));
+  check("different text hashes differently", shortHash("one") !== shortHash("two"));
+  check("hashes are short and key-safe", /^[a-z0-9]{1,8}$/.test(shortHash("Some prompt text here.")), shortHash("Some prompt text here."));
+
+  // Repeated draws produce repeated text, so compare distinct texts against
+  // distinct hashes — equal counts means no two prompts share a key.
+  const texts = new Set();
+  const hashes = new Set();
+  const rng = seeded(21);
+  for (let i = 0; i < 2000; i++) {
+    const text = pickWritingPrompt({}, rng).text;
+    texts.add(text);
+    hashes.add(shortHash(text));
+  }
+  check("no collisions across the prompt pool", hashes.size === texts.size, `${texts.size} texts -> ${hashes.size} hashes`);
 }
 
 console.log("\nTitle normalisation");
