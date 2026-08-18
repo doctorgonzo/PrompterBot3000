@@ -47,8 +47,10 @@ Threads** in that channel it says so privately, to whoever ran the command.
 
 ### `/photoshop`
 
-Pairs a random image with a challenge framing ("Make it a movie poster", "Put
-this somewhere it absolutely does not belong", "Make it Wisconsin").
+Pairs a random image with one of 50 challenge framings ("Make it a movie
+poster", "Put this somewhere it absolutely does not belong", "Make it
+Wisconsin"). Framings are drawn independently of the image, so the same framing
+lands on different artwork each time.
 
 Sources, tried in weighted-random order:
 
