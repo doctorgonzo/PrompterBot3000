@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Never let two deploys race each other.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Boots a real Worker and a mock Discord on localhost. No credentials
+      # and no outbound network calls, so this is safe on PRs from forks.
+      - name: Test
+        run: npm test
+
+  deploy:
+    name: Deploy
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Deploy to Cloudflare
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx wrangler deploy
+
+      - name: No Cloudflare token configured
+        if: steps.deploy.outcome == 'skipped'
+        run: |
+          echo "::warning::CLOUDFLARE_API_TOKEN is not set — skipping deploy."
+          echo "Add it under Settings → Secrets and variables → Actions."
+
+      # Only needed when command definitions change, but PUT replaces the whole
+      # set, so running it every time is harmless and keeps Discord in sync.
+      # Skipped unless the Discord secrets are configured.
+      - name: Register slash commands
+        id: register
+        env:
+          DISCORD_APPLICATION_ID: ${{ secrets.DISCORD_APPLICATION_ID }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+        if: steps.deploy.outcome == 'success' && env.DISCORD_BOT_TOKEN != ''
+        run: npm run register

@@ -209,6 +209,41 @@ whether a request is even reaching the Worker.
 
 ---
 
+## Continuous deployment
+
+`.github/workflows/ci.yml` runs on every push and pull request.
+
+- **Test job** — typecheck plus the full suite. Runs on PRs too, including from
+  forks: the tests need no credentials and make no outbound calls, so a
+  community PR adding writing prompts gets validated automatically.
+- **Deploy job** — pushes to `main` only, and only after tests pass. Deploys to
+  Cloudflare, then re-registers slash commands.
+
+Both deploy steps are skipped when their secrets are absent, so the workflow is
+green from the first run and starts deploying once you add them.
+
+### Required secrets
+
+Set under **Settings → Secrets and variables → Actions**:
+
+| Secret | Needed for | Where it comes from |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Deploying | Cloudflare dashboard, "Edit Cloudflare Workers" template |
+| `CLOUDFLARE_ACCOUNT_ID` | Deploying | Cloudflare dashboard sidebar, or `npx wrangler whoami` |
+| `DISCORD_APPLICATION_ID` | Registering commands | Same value as in `.dev.vars` |
+| `DISCORD_BOT_TOKEN` | Registering commands | Same value as in `.dev.vars` |
+| `DISCORD_GUILD_ID` | Registering commands | Same value as in `.dev.vars` |
+
+The Discord secrets are optional. Without them the bot still deploys; you just
+run `npm run register` by hand when command *options* change. Editing prompt
+text or handler code never needs registering.
+
+Worker secrets (`DISCORD_PUBLIC_KEY` and friends) are configured in Cloudflare
+via `wrangler secret put` and are unrelated to these — deploying does not
+touch them.
+
+---
+
 ## Tests
 
 ```bash
