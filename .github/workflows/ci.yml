@@ -39,7 +39,8 @@ jobs:
   deploy:
     name: Deploy
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Pushes to main and manual runs; never pull requests.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
