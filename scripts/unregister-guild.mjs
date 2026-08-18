@@ -27,8 +27,24 @@ if (!applicationId || !botToken || !guildId) {
 const url = `https://discord.com/api/v10/applications/${applicationId}/guilds/${guildId}/commands`;
 const headers = { "content-type": "application/json", authorization: `Bot ${botToken}` };
 
-const existing = await (await fetch(url, { headers })).json();
-if (!Array.isArray(existing) || existing.length === 0) {
+const listResponse = await fetch(url, { headers });
+
+// Distinguish a real error from an empty list — treating a 403 as "nothing to
+// do" would quietly report success while leaving the commands in place.
+if (!listResponse.ok) {
+  console.error(`Could not read guild commands (HTTP ${listResponse.status}):`);
+  console.error(await listResponse.text());
+  process.exit(1);
+}
+
+const existing = await listResponse.json();
+
+if (!Array.isArray(existing)) {
+  console.error("Unexpected response from Discord:", JSON.stringify(existing).slice(0, 200));
+  process.exit(1);
+}
+
+if (existing.length === 0) {
   console.log(`No guild-scoped commands registered in ${guildId}. Nothing to do.`);
   process.exit(0);
 }
