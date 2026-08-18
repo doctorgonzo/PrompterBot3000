@@ -287,6 +287,15 @@ async function runTests() {
     result.text,
   );
 
+  result = await post(slashCommand("writingprompt", [intOption("closes", 24)]));
+  const deadlineField = (result.json?.data?.embeds?.[0]?.fields ?? []).find((f) => /close/i.test(f.name));
+  check("a writing prompt can carry a deadline", Boolean(deadlineField), JSON.stringify(result.json?.data?.embeds?.[0]?.fields));
+  check("the deadline renders in the reader's timezone", /<t:\d+:[FR]>/.test(deadlineField?.value ?? ""), deadlineField?.value);
+
+  result = await post(slashCommand("writingprompt", [intOption("closes", 0)]));
+  check("no deadline is the default",
+    !(result.json?.data?.embeds?.[0]?.fields ?? []).some((f) => /close/i.test(f.name)));
+
   result = await post(slashCommand("writingprompt", [stringOption("genre", "not-a-genre")]));
   check("bogus option value falls back instead of erroring", result.json?.data?.embeds?.[0]?.description?.length > 0, result.text);
 
@@ -383,6 +392,13 @@ async function runTests() {
   await settle();
 
   resetMock();
+  await post(slashCommand("photoshop", [intOption("closes", 48)]));
+  edit = await waitForRequest(isEdit);
+  const psFields = JSON.parse(edit?.body ?? "{}").embeds?.[0]?.fields ?? [];
+  check("a photoshop challenge can carry a deadline", psFields.some((f) => /close/i.test(f.name)), JSON.stringify(psFields));
+
+  await settle();
+  resetMock();
   await post(slashCommand("photoshop", [boolOption("thread", false)]));
   await waitForRequest(isEdit);
   await settle();
@@ -467,6 +483,9 @@ async function runTests() {
 
   result = await post(slashCommand("schedule", [stringOption("days", "weekdays")], { guild_id: "daily-guild" }));
   check("cadence can be set to weekdays", /every weekday/i.test(result.json?.data?.content ?? ""), result.text);
+
+  result = await post(slashCommand("schedule", [intOption("closes", 48)], { guild_id: "daily-guild" }));
+  check("scheduled posts can carry a deadline", /48 hours/.test(result.json?.data?.content ?? ""), result.text);
 
   result = await post(slashCommand("schedule", [stringOption("kind", "off")], { guild_id: "daily-guild" }));
   check("a schedule can be turned off", /off/i.test(result.json?.data?.content ?? ""), result.text);

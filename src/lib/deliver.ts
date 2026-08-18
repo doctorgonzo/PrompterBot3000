@@ -1,6 +1,6 @@
 import { getOriginalResponse, type DiscordMessage, type Env, type Interaction } from "./discord.ts";
 import type { BuiltPrompt } from "./prompt-builders.ts";
-import { markSeen, rememberLastPrompt } from "./store.ts";
+import { markSeen, rememberLastPrompt, schedulePromptClose } from "./store.ts";
 import { openThreadForInteraction } from "./threads.ts";
 
 /**
@@ -37,6 +37,16 @@ export async function finalizePrompt(
   }
 
   if (options.wantsThread && interaction.guild_id) {
-    await openThreadForInteraction(env, interaction.token, built.threadName, message);
+    const threadId = await openThreadForInteraction(
+      env,
+      interaction.token,
+      built.threadName,
+      message,
+    );
+
+    // A deadline is only meaningful if there is a thread to close.
+    if (threadId && built.closesAt) {
+      await schedulePromptClose(env, { threadId, closesAt: built.closesAt });
+    }
   }
 }

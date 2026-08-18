@@ -210,7 +210,7 @@ export async function startThreadFromMessage(
   message: DiscordMessage,
   name: string,
   autoArchiveMinutes: number,
-): Promise<{ ok: true } | { ok: false; status: number }> {
+): Promise<{ ok: true; threadId: string } | { ok: false; status: number }> {
   const url = `${apiBase(env)}/channels/${message.channel_id}/messages/${message.id}/threads`;
   const response = await fetch(url, {
     method: "POST",
@@ -221,10 +221,35 @@ export async function startThreadFromMessage(
     body: JSON.stringify({ name, auto_archive_duration: autoArchiveMinutes }),
   });
 
-  if (response.ok) return { ok: true };
+  if (response.ok) {
+    const thread = (await response.json()) as { id: string };
+    return { ok: true, threadId: thread.id };
+  }
 
   console.error("startThreadFromMessage failed", response.status, await response.text());
   return { ok: false, status: response.status };
+}
+
+/**
+ * Locks and archives a thread, so no further replies can land.
+ *
+ * Needs the Manage Threads permission. Callers should treat failure as
+ * non-fatal — announcing a deadline has passed still works without locking.
+ */
+export async function lockThread(env: Env, threadId: string): Promise<boolean> {
+  const response = await fetch(`${apiBase(env)}/channels/${threadId}`, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+    },
+    body: JSON.stringify({ locked: true, archived: true }),
+  });
+
+  if (response.ok) return true;
+
+  console.error("lockThread failed", threadId, response.status, await response.text());
+  return false;
 }
 
 export interface Embed {

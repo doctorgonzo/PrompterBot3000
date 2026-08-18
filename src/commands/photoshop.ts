@@ -15,7 +15,7 @@ import { PHOTOSHOP_COMMAND } from "./definitions.ts";
 async function deliver(
   env: Env,
   interaction: Interaction,
-  options: { sourceId?: string; wantsThread: boolean },
+  options: { sourceId?: string; wantsThread: boolean; closesInHours?: number },
 ): Promise<void> {
   const guildId = interaction.guild_id;
   const config = guildId ? await getGuildConfig(env, guildId) : { disabledSources: [] };
@@ -26,6 +26,7 @@ async function deliver(
     {
       requester: actorName(interaction),
       isRepeat: guildId ? (key) => hasSeen(env, guildId, key) : undefined,
+      closesInHours: options.closesInHours,
     },
   );
 
@@ -49,11 +50,13 @@ export const photoshop: Command = {
   name: PHOTOSHOP_COMMAND.name,
   handler: ({ interaction, env, ctx }) => {
     const rawSource = getOption(interaction, "source");
+    const closes = getOption(interaction, "closes");
 
     ctx.waitUntil(
       deliver(env, interaction, {
         sourceId: typeof rawSource === "string" ? rawSource : undefined,
         wantsThread: getOption(interaction, "thread") !== false,
+        closesInHours: typeof closes === "number" && closes > 0 ? closes : undefined,
       }),
     );
 

@@ -1,4 +1,5 @@
-import { postMessage, startThreadFromMessage, type Env } from "./discord.ts";
+import { postMessage, type Env } from "./discord.ts";
+import { startThread } from "./threads.ts";
 import { buildPhotoshopPrompt, buildWritingPrompt, isFailure } from "./prompt-builders.ts";
 import {
   getGuildConfig,
@@ -6,6 +7,7 @@ import {
   listDailyConfigs,
   markSeen,
   rememberLastPrompt,
+  schedulePromptClose,
   setDailyConfig,
   type DailyConfig,
   type PromptKind,
@@ -15,8 +17,6 @@ import {
 export const DAILY_TIME_ZONE = "America/Chicago";
 
 export const DEFAULT_DAILY_HOUR = 10;
-
-const AUTO_ARCHIVE_MINUTES = 10080;
 
 export interface LocalTime {
   /** YYYY-MM-DD in DAILY_TIME_ZONE. */
@@ -108,7 +108,10 @@ export function nextKind(config: DailyConfig): PromptKind {
 
 async function postDaily(env: Env, config: DailyConfig, now: LocalTime): Promise<boolean> {
   const kind = nextKind(config);
-  const context = { isRepeat: (key: string) => hasSeen(env, config.guildId, key) };
+  const context = {
+    isRepeat: (key: string) => hasSeen(env, config.guildId, key),
+    ...(config.closesInHours ? { closesInHours: config.closesInHours } : {}),
+  };
 
   const built =
     kind === "writing"
@@ -140,7 +143,10 @@ async function postDaily(env: Env, config: DailyConfig, now: LocalTime): Promise
     options: built.options,
   });
 
-  await startThreadFromMessage(env, message, built.threadName, AUTO_ARCHIVE_MINUTES);
+  const threadId = await startThread(env, message, built.threadName);
+  if (threadId && built.closesAt) {
+    await schedulePromptClose(env, { threadId, closesAt: built.closesAt });
+  }
 
   await setDailyConfig(env, { ...config, lastKind: built.kind, lastPostedDate: now.date });
   return true;

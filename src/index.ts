@@ -1,4 +1,5 @@
 import { commands } from "./commands/index.ts";
+import { runPromptClosures } from "./lib/closures.ts";
 import { runDailyPrompts } from "./lib/daily.ts";
 import { InteractionType, pong, reply, type Env, type Interaction } from "./lib/discord.ts";
 import { verifyDiscordRequest } from "./lib/verify.ts";
@@ -67,10 +68,16 @@ export default {
    * the work here is mostly deciding who is due.
    */
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const instant = new Date(event.scheduledTime);
+
     ctx.waitUntil(
-      runDailyPrompts(env, new Date(event.scheduledTime)).then((posted) => {
-        console.log("daily run complete", { cron: event.cron, posted });
-      }),
+      (async () => {
+        // Close expired submission threads before posting new prompts, so a
+        // channel never briefly shows two open contests.
+        const closed = await runPromptClosures(env, instant);
+        const posted = await runDailyPrompts(env, instant);
+        console.log("scheduled run complete", { cron: event.cron, closed, posted });
+      })(),
     );
   },
 };

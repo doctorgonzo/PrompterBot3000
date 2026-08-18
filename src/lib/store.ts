@@ -20,13 +20,20 @@ export interface GuildConfig {
 
 export type PromptKind = "writing" | "photoshop";
 
+/** A submission thread waiting to be closed. */
+export interface PendingClose {
+  threadId: string;
+  /** Unix seconds. */
+  closesAt: number;
+}
+
 export interface LastPrompt {
   messageId: string;
   /** Taken from the posted message rather than assumed from the interaction. */
   channelId: string;
   kind: PromptKind;
   /** The original command options, so a reroll keeps the same filters. */
-  options: Record<string, string | boolean>;
+  options: Record<string, string | number | boolean>;
 }
 
 const EMPTY_CONFIG: GuildConfig = { disabledSources: [] };
@@ -41,6 +48,8 @@ export interface DailyConfig {
   hour: number;
   /** Weekdays to post on, 0 = Sunday. Absent means every day. */
   days?: number[];
+  /** Hours until submissions close on scheduled posts. 0/absent = no deadline. */
+  closesInHours?: number;
   /** Last kind actually posted, so "alternate" knows which comes next. */
   lastKind?: PromptKind;
   /** Local date (YYYY-MM-DD) of the last post, to prevent double-posting. */
@@ -210,5 +219,54 @@ export async function listDailyConfigs(env: Env): Promise<DailyConfig[]> {
   } catch (error) {
     console.error("listDailyConfigs failed", error);
     return [];
+  }
+}
+
+/** Records a thread to close once its deadline passes. */
+export async function schedulePromptClose(env: Env, close: PendingClose): Promise<void> {
+  if (!env.PROMPT_STATE) return;
+
+  // Keep the record a little past its deadline so a missed sweep can still
+  // catch it, then let it expire on its own.
+  const ttl = Math.max(60, close.closesAt - Math.floor(Date.now() / 1000) + 60 * 60 * 24);
+
+  try {
+    await env.PROMPT_STATE.put(`close:${close.threadId}`, JSON.stringify(close), {
+      expirationTtl: ttl,
+    });
+  } catch (error) {
+    console.error("schedulePromptClose failed", error);
+  }
+}
+
+export async function listDueCloses(env: Env, nowSeconds: number): Promise<PendingClose[]> {
+  if (!env.PROMPT_STATE) return [];
+
+  try {
+    const due: PendingClose[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const page = await env.PROMPT_STATE.list({ prefix: "close:", cursor });
+      for (const key of page.keys) {
+        const close = await env.PROMPT_STATE.get<PendingClose>(key.name, "json");
+        if (close && close.closesAt <= nowSeconds) due.push(close);
+      }
+      cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+
+    return due;
+  } catch (error) {
+    console.error("listDueCloses failed", error);
+    return [];
+  }
+}
+
+export async function clearPromptClose(env: Env, threadId: string): Promise<void> {
+  if (!env.PROMPT_STATE) return;
+  try {
+    await env.PROMPT_STATE.delete(`close:${threadId}`);
+  } catch (error) {
+    console.error("clearPromptClose failed", error);
   }
 }

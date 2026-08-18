@@ -15,14 +15,33 @@ const WRITING_REPEAT_ATTEMPTS = 5;
 
 const challenges = (challengeData as { challenges: string[] }).challenges;
 
+/** Unix seconds for the deadline, or undefined when there isn't one. */
+function deadlineFrom(hours: number | undefined, now = Date.now()): number | undefined {
+  if (!hours || hours <= 0) return undefined;
+  return Math.floor(now / 1000) + hours * 3600;
+}
+
+/**
+ * Discord renders <t:...> in the reader's own timezone, so a deadline reads
+ * correctly for everyone without us naming one.
+ */
+function deadlineField(closesAt: number) {
+  return {
+    name: "⏳ Submissions close",
+    value: `<t:${closesAt}:F> — <t:${closesAt}:R>`,
+  };
+}
+
 export interface BuiltPrompt {
   kind: PromptKind;
+  /** Unix seconds when submissions close, if a deadline was requested. */
+  closesAt?: number;
   /** Message payload, ready to post or to PATCH into a deferred response. */
   payload: Record<string, unknown>;
   threadName: string;
   dedupeKey: string;
   /** The options that produced it, so /reroll can reproduce the same filters. */
-  options: Record<string, string | boolean>;
+  options: Record<string, string | number | boolean>;
   /** Fired after posting, for sources that require usage reporting. */
   onPosted?: (env: Env) => Promise<void>;
 }
@@ -37,6 +56,8 @@ export const isFailure = (result: BuildResult): result is BuildFailure => "error
 
 export interface BuildContext {
   requester?: string;
+  /** Hours until submissions close. 0 or absent means no deadline. */
+  closesInHours?: number;
   /** Returns true when this prompt was posted in the guild recently. */
   isRepeat?: (dedupeKey: string) => Promise<boolean>;
 }
@@ -81,17 +102,22 @@ export async function buildWritingPrompt(
   const footer: string[] = [GENRE_LABELS[prompt.genre], LENGTH_HINTS[prompt.length]];
   if (context.requester) footer.push(`for ${context.requester}`);
 
+  const closesAt = deadlineFrom(context.closesInHours);
+  const fields = [
+    ...(prompt.constraint ? [{ name: "Constraint", value: prompt.constraint }] : []),
+    ...(closesAt ? [deadlineField(closesAt)] : []),
+  ];
+
   return {
     kind: "writing",
+    ...(closesAt ? { closesAt } : {}),
     payload: {
       embeds: [
         {
           title: "✍️ Writing Prompt",
           description: prompt.text,
           color: WRITING_COLOR,
-          ...(prompt.constraint
-            ? { fields: [{ name: "Constraint", value: prompt.constraint }] }
-            : {}),
+          ...(fields.length > 0 ? { fields } : {}),
           footer: { text: footer.join(" · ") },
         },
       ],
@@ -102,6 +128,7 @@ export async function buildWritingPrompt(
       ...(options.genre ? { genre: options.genre } : {}),
       ...(options.length ? { length: options.length } : {}),
       ...(options.constraint ? { constraint: true } : {}),
+      ...(context.closesInHours ? { closes: context.closesInHours } : {}),
     },
   };
 }
@@ -131,9 +158,11 @@ export async function buildPhotoshopPrompt(
   }
 
   const challenge = pick(challenges, Math.random);
+  const closesAt = deadlineFrom(context.closesInHours);
 
   return {
     kind: "photoshop",
+    ...(closesAt ? { closesAt } : {}),
     payload: {
       embeds: [
         {
@@ -143,13 +172,17 @@ export async function buildPhotoshopPrompt(
           description: `**${challenge}**\n\n${image.attribution}`,
           color: PHOTOSHOP_COLOR,
           image: { url: image.imageUrl },
+          ...(closesAt ? { fields: [deadlineField(closesAt)] } : {}),
           ...(context.requester ? { footer: { text: `for ${context.requester}` } } : {}),
         },
       ],
     },
     threadName: threadNameFor(image.title, "🖼️ "),
     dedupeKey: image.dedupeKey,
-    options: options.sourceId ? { source: options.sourceId } : {},
+    options: {
+      ...(options.sourceId ? { source: options.sourceId } : {}),
+      ...(context.closesInHours ? { closes: context.closesInHours } : {}),
+    },
     ...(image.usageTrackingUrl
       ? {
           onPosted: async (usedEnv: Env) => {

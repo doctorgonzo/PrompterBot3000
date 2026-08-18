@@ -13,13 +13,21 @@ import {
   setDailyConfig,
   type DailyConfig,
 } from "../lib/store.ts";
-import { SCHEDULE_COMMAND } from "./definitions.ts";
+import { CLOSES_CHOICES, SCHEDULE_COMMAND } from "./definitions.ts";
 
 const KIND_LABELS: Record<string, string> = {
   writing: "writing prompts",
   photoshop: "Photoshop challenges",
   alternate: "alternating writing prompts and Photoshop challenges",
 };
+
+/**
+ * Renders a deadline using the same wording as the picker, so the confirmation
+ * echoes back exactly what was chosen.
+ */
+function describeHours(hours: number): string {
+  return CLOSES_CHOICES.find((choice) => choice.value === hours)?.name ?? `${hours} hours`;
+}
 
 /** Renders the hour the way a person would say it. */
 function hourLabel(hour: number): string {
@@ -30,9 +38,13 @@ function hourLabel(hour: number): string {
 
 function describe(config: DailyConfig): string {
   const upNext = config.kind === "alternate" ? ` Up next: ${KIND_LABELS[nextKind(config)]}.` : "";
+  const closes = config.closesInHours
+    ? ` Submissions close after **${describeHours(config.closesInHours)}**.`
+    : "";
+
   return (
     `Scheduled prompts are **on** — ${KIND_LABELS[config.kind]} in <#${config.channelId}>, ` +
-    `**${describeDays(config.days)}** at **${hourLabel(config.hour)}** Madison time.${upNext}`
+    `**${describeDays(config.days)}** at **${hourLabel(config.hour)}** Madison time.${closes}${upNext}`
   );
 }
 
@@ -55,10 +67,17 @@ export const schedule: Command = {
     const channel = getOption(interaction, "channel");
     const hour = getOption(interaction, "hour");
     const days = getOption(interaction, "days");
+    const closes = getOption(interaction, "closes");
     const existing = await getDailyConfig(env, guildId);
 
     // No options: report the current schedule.
-    if (kind === undefined && channel === undefined && hour === undefined && days === undefined) {
+    if (
+      kind === undefined &&
+      channel === undefined &&
+      hour === undefined &&
+      days === undefined &&
+      closes === undefined
+    ) {
       return reply(
         existing
           ? describe(existing)
@@ -82,6 +101,7 @@ export const schedule: Command = {
     const resolvedHour = typeof hour === "number" ? hour : existing?.hour ?? DEFAULT_DAILY_HOUR;
     const resolvedDays =
       typeof days === "string" ? resolveDays(days) : existing?.days ?? resolveDays("daily");
+    const resolvedCloses = typeof closes === "number" ? closes : existing?.closesInHours ?? 0;
 
     const now = localTime(new Date());
 
@@ -91,6 +111,7 @@ export const schedule: Command = {
       kind: resolvedKind,
       hour: resolvedHour,
       days: resolvedDays,
+      ...(resolvedCloses > 0 ? { closesInHours: resolvedCloses } : {}),
       ...(existing?.lastKind ? { lastKind: existing.lastKind } : {}),
       // If today's slot has already passed, mark today as done so scheduling
       // doesn't fire a surprise post within the hour. Starts tomorrow instead.

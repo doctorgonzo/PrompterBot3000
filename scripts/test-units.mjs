@@ -8,6 +8,8 @@
 
 import { pickWritingPrompt, promptStats } from "../src/lib/prompts.ts";
 import { threadNameFor } from "../src/lib/threads.ts";
+import { buildWritingPrompt } from "../src/lib/prompt-builders.ts";
+import { runPromptClosures } from "../src/lib/closures.ts";
 import { weightedOrder } from "../src/lib/random.ts";
 import { IMAGE_SOURCES, fetchImagePrompt, selectSources, drawFrom } from "../src/lib/images/index.ts";
 import { shortHash } from "../src/lib/store.ts";
@@ -279,6 +281,114 @@ console.log("\nKey hashing");
     hashes.add(shortHash(text));
   }
   check("no collisions across the prompt pool", hashes.size === texts.size, `${texts.size} texts -> ${hashes.size} hashes`);
+}
+
+console.log("\nSubmission deadlines");
+{
+  const withDeadline = await buildWritingPrompt({}, { closesInHours: 24 });
+  const field = withDeadline.payload.embeds[0].fields?.find((f) => /close/i.test(f.name));
+
+  check("a deadline is attached", typeof withDeadline.closesAt === "number");
+  check("the deadline is roughly right",
+    Math.abs(withDeadline.closesAt - (Math.floor(Date.now() / 1000) + 24 * 3600)) < 60,
+    String(withDeadline.closesAt));
+  check("the embed shows it", Boolean(field), JSON.stringify(withDeadline.payload.embeds[0].fields));
+  // Discord renders <t:...> in each reader's own timezone.
+  check("it uses Discord timestamp markup", /<t:\d+:[FR]>/.test(field?.value ?? ""), field?.value);
+  check("the deadline survives into reroll options", withDeadline.options.closes === 24);
+
+  const noDeadline = await buildWritingPrompt({}, {});
+  check("no deadline by default", noDeadline.closesAt === undefined);
+  check("no deadline field by default",
+    !(noDeadline.payload.embeds[0].fields ?? []).some((f) => /close/i.test(f.name)));
+
+  const zero = await buildWritingPrompt({}, { closesInHours: 0 });
+  check("zero hours means no deadline", zero.closesAt === undefined);
+
+  // A constraint and a deadline must coexist rather than overwrite each other.
+  const both = await buildWritingPrompt({ constraint: true }, { closesInHours: 48 });
+  const names = (both.payload.embeds[0].fields ?? []).map((f) => f.name);
+  check("constraint and deadline coexist",
+    names.some((n) => /constraint/i.test(n)) && names.some((n) => /close/i.test(n)),
+    names.join(", "));
+}
+
+console.log("\nClosing submission threads");
+{
+  const fakeKv = () => {
+    const map = new Map();
+    return {
+      map,
+      async get(key, type) { const raw = map.get(key); return raw === undefined ? null : (type === "json" ? JSON.parse(raw) : raw); },
+      async put(key, value) { map.set(key, value); },
+      async delete(key) { map.delete(key); },
+      async list({ prefix = "" } = {}) { return { keys: [...map.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
+    };
+  };
+
+  const calls = [];
+  let postOk = true;
+  let lockOk = true;
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      calls.push({ method: req.method, url: req.url, body });
+      const failing = (req.method === "POST" && !postOk) || (req.method === "PATCH" && !lockOk);
+      res.writeHead(failing ? 403 : 200, { "content-type": "application/json" });
+      res.end(JSON.stringify(failing ? { message: "Missing Permissions" } : { id: "t1" }));
+    });
+  });
+  const port = 8791;
+  await new Promise((resolve) => server.listen(port, resolve));
+  const makeEnv = (kv) => ({ DISCORD_API_BASE: `http://localhost:${port}`, DISCORD_APPLICATION_ID: "a", DISCORD_BOT_TOKEN: "t", PROMPT_STATE: kv });
+
+  const now = Math.floor(Date.UTC(2026, 6, 1, 15) / 1000);
+  const at = new Date(now * 1000);
+
+  let kv = fakeKv();
+  kv.map.set("close:thread-1", JSON.stringify({ threadId: "thread-1", closesAt: now - 60 }));
+  calls.length = 0;
+  let closed = await runPromptClosures(makeEnv(kv), at);
+
+  check("a due thread is closed", closed === 1, `closed ${closed}`);
+  check("a closing notice is posted", calls.some((c) => c.method === "POST" && c.url === "/channels/thread-1/messages"));
+  check("the notice says submissions are closed", /closed/i.test(calls.find((c) => c.method === "POST")?.body ?? ""));
+  const lock = calls.find((c) => c.method === "PATCH");
+  check("the thread is locked and archived",
+    JSON.parse(lock?.body ?? "{}").locked === true && JSON.parse(lock?.body ?? "{}").archived === true, lock?.body);
+  check("the record is cleared", kv.map.size === 0);
+  // Notice before lock: you cannot post into an archived thread.
+  check("the notice precedes the lock",
+    calls.findIndex((c) => c.method === "POST") < calls.findIndex((c) => c.method === "PATCH"));
+
+  kv = fakeKv();
+  kv.map.set("close:thread-2", JSON.stringify({ threadId: "thread-2", closesAt: now + 3600 }));
+  calls.length = 0;
+  closed = await runPromptClosures(makeEnv(kv), at);
+  check("a future deadline is left alone", closed === 0 && calls.length === 0);
+  check("its record is kept", kv.map.size === 1);
+
+  // Without Manage Threads the notice still lands; only the lock fails.
+  kv = fakeKv();
+  kv.map.set("close:thread-3", JSON.stringify({ threadId: "thread-3", closesAt: now - 60 }));
+  calls.length = 0;
+  lockOk = false;
+  closed = await runPromptClosures(makeEnv(kv), at);
+  check("a failed lock still counts as closed", closed === 1, "the deadline was still announced");
+  check("the notice was posted anyway", calls.some((c) => c.method === "POST"));
+  lockOk = true;
+
+  // A deleted thread (e.g. rerolled) must not be retried forever.
+  kv = fakeKv();
+  kv.map.set("close:gone", JSON.stringify({ threadId: "gone", closesAt: now - 60 }));
+  postOk = false;
+  closed = await runPromptClosures(makeEnv(kv), at);
+  check("a vanished thread is not counted", closed === 0);
+  check("a vanished thread is cleared, not retried forever", kv.map.size === 0);
+  postOk = true;
+
+  server.close();
 }
 
 console.log("\nDaily scheduling: local time");

@@ -16,10 +16,10 @@ server to babysit.
 | Command | Who | What it does |
 |---|---|---|
 | `/ping` | Anyone | Confirms the bot is awake (visible only to you) |
-| `/writingprompt [genre] [length] [constraint] [thread]` | Anyone | Posts a writing prompt |
-| `/photoshop [source] [thread]` | Anyone | Posts an image as a Photoshop challenge |
+| `/writingprompt [genre] [length] [constraint] [thread] [closes]` | Anyone | Posts a writing prompt |
+| `/photoshop [source] [thread] [closes]` | Anyone | Posts an image as a Photoshop challenge |
 | `/promptconfig [source] [enabled]` | Manage Server | View or change which image sources this server uses |
-| `/schedule [kind] [channel] [days] [hour]` | Manage Server | Schedule recurring prompts |
+| `/schedule [kind] [channel] [days] [hour] [closes]` | Manage Server | Schedule recurring prompts |
 | `/reroll` | Manage Messages | Replaces the most recent prompt in the channel |
 
 The two moderator commands are gated with `default_member_permissions`, so
@@ -141,6 +141,34 @@ rather than firing a surprise post within the hour.
 Schedules saved before cadence existed keep posting daily — an absent `days`
 means every day.
 
+### Submission deadlines
+
+Any prompt can run as a timed contest. Pass `closes` — 24 hours, 48 hours,
+3 days, or 1 week — and the prompt shows a closing time:
+
+> ⏳ **Submissions close**
+> Friday, 20 August 2026 10:00 — in 2 days
+
+The time is rendered with Discord's `<t:...>` markup, so every reader sees it in
+their own timezone without the bot naming one.
+
+When the deadline passes, the bot posts a closing notice in the submission
+thread and locks it, so no further entries land. `/schedule closes:` applies the
+same deadline to every scheduled post, and `/reroll` inherits the original's
+deadline with the clock restarted.
+
+Deadlines are swept by the same hourly cron as the scheduled prompts, so closing
+is accurate to the hour. The prompt shows the exact time, so nobody has to guess
+where the boundary is.
+
+**Locking needs the Manage Threads permission.** Without it the bot still
+announces that submissions are closed, but the thread stays open — the feature
+degrades rather than breaking. Grant it under Server Settings → Roles, or
+re-invite with permission integer `326417632320`.
+
+A thread that has been deleted — because its prompt was rerolled — is dropped
+rather than retried.
+
 ### Repeat suppression
 
 Every prompt posted is recorded per-server for 45 days, and draws that come back
@@ -236,12 +264,15 @@ which looks like a bad token but isn't.
 Replace `<APPLICATION_ID>` with yours:
 
 ```
-https://discord.com/api/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot%20applications.commands&permissions=309237763136
+https://discord.com/api/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot%20applications.commands&permissions=326417632320
 ```
 
 That permission integer grants: view channels, send messages, embed links,
-attach files, add reactions, read message history, create public threads, and
-send messages in threads.
+attach files, add reactions, read message history, create public threads, send
+messages in threads, and manage threads.
+
+Manage Threads is only used to lock a thread when its submission deadline
+passes. Without it everything else still works.
 
 ### 7. Register the slash commands
 
@@ -339,7 +370,7 @@ touch them.
 npm test
 ```
 
-Two suites, 176 checks. `scripts/test-units.mjs` covers prompt selection and
+Two suites, 202 checks. `scripts/test-units.mjs` covers prompt selection and
 thread naming against the real data files — every genre/length combination,
 filter correctness, generated-text grammar, genre pool isolation, and
 determinism under a seeded RNG — so a bad edit to `data/*.json` fails here
@@ -380,6 +411,7 @@ src/
     verify.ts            Ed25519 signature verification (WebCrypto)
     discord.ts           API types and response helpers
     daily.ts             Scheduled daily prompt: timing rules and runner
+    closures.ts          Closing submission threads when deadlines pass
     prompts.ts           Prompt selection: curated pack + mixer
     prompt-builders.ts   Builds the message for each prompt kind
     deliver.ts           Post-publish work: seen-marking, thread, reroll pointer

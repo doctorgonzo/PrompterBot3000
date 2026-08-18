@@ -5,6 +5,8 @@ import { asGenre, asLength } from "../lib/prompts.ts";
 import { hasSeen } from "../lib/store.ts";
 import { WRITING_PROMPT_COMMAND } from "./definitions.ts";
 
+const asHours = (value: unknown) => (typeof value === "number" && value > 0 ? value : undefined);
+
 /**
  * Answers inline rather than deferring: selection is local, and the repeat
  * check is a handful of fast KV reads, so this stays well inside Discord's
@@ -24,6 +26,7 @@ export const writingPrompt: Command = {
       {
         requester: actorName(interaction),
         isRepeat: guildId ? (key) => hasSeen(env, guildId, key) : undefined,
+        closesInHours: asHours(getOption(interaction, "closes")),
       },
     );
 

@@ -52,7 +52,7 @@ export async function openThreadForInteraction(
   interactionToken: string,
   name: string,
   message?: DiscordMessage,
-): Promise<void> {
+): Promise<string | null> {
   const target = message ?? (await getOriginalResponse(env, interactionToken));
 
   if (!target) {
@@ -60,7 +60,7 @@ export async function openThreadForInteraction(
       content: "I posted the prompt, but couldn't find it again to open a thread.",
       flags: MessageFlags.EPHEMERAL,
     });
-    return;
+    return null;
   }
 
   const result = await startThreadFromMessage(env, target, name, AUTO_ARCHIVE_MINUTES);
@@ -70,5 +70,18 @@ export async function openThreadForInteraction(
       content: failureMessage(result.status),
       flags: MessageFlags.EPHEMERAL,
     });
+    return null;
   }
+
+  return result.threadId;
+}
+
+/** Thread creation for callers with no interaction to report back to (cron). */
+export async function startThread(
+  env: Env,
+  message: DiscordMessage,
+  name: string,
+): Promise<string | null> {
+  const result = await startThreadFromMessage(env, message, name, AUTO_ARCHIVE_MINUTES);
+  return result.ok ? result.threadId : null;
 }

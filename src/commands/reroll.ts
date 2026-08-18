@@ -35,6 +35,9 @@ async function rerollLast(env: Env, interaction: Interaction): Promise<void> {
   const context = {
     requester: actorName(interaction),
     isRepeat: (key: string) => hasSeen(env, guildId, key),
+    // The replacement inherits the original's deadline setting, restarting
+    // the clock from now.
+    ...(typeof last.options.closes === "number" ? { closesInHours: last.options.closes } : {}),
   };
 
   const built =

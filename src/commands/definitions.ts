@@ -51,6 +51,23 @@ export const LENGTH_HINTS = {
   poem: "a poem",
 } as const;
 
+/** Hours until submissions close. 0 means no deadline. */
+export const CLOSES_CHOICES = [
+  { name: "No deadline", value: 0 },
+  { name: "24 hours", value: 24 },
+  { name: "48 hours", value: 48 },
+  { name: "3 days", value: 72 },
+  { name: "1 week", value: 168 },
+];
+
+const closesOption = (description: string) => ({
+  name: "closes",
+  description,
+  type: INTEGER_OPTION,
+  required: false,
+  choices: CLOSES_CHOICES,
+});
+
 export const PING_COMMAND = {
   name: "ping",
   description: "Check that AutoPrompter is awake",
@@ -88,6 +105,7 @@ export const WRITING_PROMPT_COMMAND = {
       type: BOOLEAN_OPTION,
       required: false,
     },
+    closesOption("Close submissions after this long (default: no deadline)"),
   ],
 };
 
@@ -116,6 +134,7 @@ export const PHOTOSHOP_COMMAND = {
       type: BOOLEAN_OPTION,
       required: false,
     },
+    closesOption("Close submissions after this long (default: no deadline)"),
   ],
 };
 
@@ -202,6 +221,7 @@ export const SCHEDULE_COMMAND = {
       min_value: 0,
       max_value: 23,
     },
+    closesOption("Close submissions this long after each scheduled post"),
   ],
 };
 
